@@ -1,0 +1,176 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	
+	<Frame name="Quest_CompassNavBarTemplate"  virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture file="Interface\HelpFrame\CS_HelpTextures_Tile" horizTile="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativePoint="TOPLEFT" x="0" y="-5"/>
+						<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" x="0" y="0"/>
+					</Anchors>
+					<TexCoords left="0.00000000" right="1.00000000" top="0.18750000" bottom="0.25390625"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<KeyValues>
+			<KeyValue key="layoutType" value="InsetFrameTemplate" type="string"/>
+		</KeyValues>
+		<Frames>
+			<Frame parentKey="NineSlice" useParentLevel="true" inherits="NineSlicePanelTemplate"/>
+		</Frames>
+	</Frame>
+	
+	<Button name="Quest_CompassItemButtonTemplate" inherits="SecureActionButtonTemplate" hidden="true" virtual="true">
+		<Size x="25" y="25"/>
+<!-- 		<Anchors>
+			<Anchor point="CENTER" relativeKey="$parent.navButton" relativePoint="RIGHT" x="-8" y="-17"/>
+		</Anchors>
+ -->		<Frames>
+			<Frame parentKey="textureHandler" useParentLevel="true">
+				<Size x="25" y="25"/>
+				<Anchors>
+					<Anchor point="CENTER"  x="0" y="0"/>
+				</Anchors>
+			</Frame>
+			
+			<Cooldown parentKey="Cooldown" inherits="CooldownFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.textureHandler" x="0" y="0"/>
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.textureHandler" x="0" y="0"/>
+				</Anchors>
+			</Cooldown>
+		</Frames>
+		
+		
+		<Layers>
+			<Layer level="ARTWORK">
+<!-- 				<FontString parentKey="HotKey" inherits="NumberFontNormalSmallGray" justifyH="LEFT" text="RANGE_INDICATOR">
+					<Size x="29" y="10"/>
+					<Anchors>
+						<Anchor point="Right" relativeKey="$parent.textureHandler" x="0" y="-14"/>
+					</Anchors>
+				</FontString> -->
+				<FontString parentKey="Count" inherits="NumberFontNormalSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.textureHandler" x="-3" y="2"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+
+
+			<Layer level="BACKGROUND">
+
+			
+				<Texture parentKey="icon">
+					<Size x="15" y="15"/>
+					<Anchors>
+						<Anchor point="CENTER" relativeKey="$parent.textureHandler" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			
+			
+			
+			
+		</Layers>
+
+		<Scripts>
+			<OnLoad function="QuestObjectiveItem_OnLoad"/>
+			<OnEvent function="QuestObjectiveItem_OnEvent"/>
+			<OnUpdate function="QuestObjectiveItem_OnUpdate"/>
+			<OnShow function="QuestObjectiveItem_OnShow"/>
+			<OnHide function="QuestObjectiveItem_OnHide"/>
+			<OnEnter function="QuestObjectiveItem_OnEnter"/>
+			<OnLeave>
+				GameTooltip:Hide();
+			</OnLeave>
+		</Scripts>
+		
+		<HighlightTexture parentKey="Light" file="Interface\Artifacts\Artifacts-PerkRing-Final-Mask" alphaMode="ADD">
+			<Anchors>
+				<Anchor point="TOPLEFT" relativeKey="$parent.textureHandler" x="0" y="0"/>
+				<Anchor point="BOTTOMRIGHT" relativeKey="$parent.textureHandler" x="0" y="0"/>
+			</Anchors>
+		</HighlightTexture>
+		<NormalTexture parentKey="Normal" file="Interface\Artifacts\Artifacts-PerkRing-Final-Mask">	
+			<Anchors>
+				<Anchor point="TOPLEFT" relativeKey="$parent.textureHandler" x="0" y="0"/>
+				<Anchor point="BOTTOMRIGHT" relativeKey="$parent.textureHandler" x="0" y="0"/>
+			</Anchors>
+		</NormalTexture>
+	</Button>
+	
+
+
+
+	<Button name="Q_C-EyeHighlightAnim" virtual="true">
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture parentKey="Highlight" hidden="true" alpha="0" alphaMode="ADD" atlas="groupfinder-eye-highlight" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Animations>
+			<AnimationGroup parentKey="EyeHighlightAnim" setToFinalAlpha="true" looping="REPEAT">
+				<Scale childKey="Highlight" startDelay="0.1" smoothing="NONE" duration="1.0" order="1" fromScaleX="0.39" fromScaleY="0.39" toScaleX="1" toScaleY="1"/>
+				<Alpha childKey="Highlight" startDelay="0.1" smoothing="NONE" duration="1.0" order="1" fromAlpha="1" toAlpha="0"/>
+				<Scripts>
+					<OnLoop>
+						if ( QueueStatusMinimapButton_OnGlowPulse(self:GetParent()) ) then
+						--	PlaySound(SOUNDKIT.UI_GROUP_FINDER_RECEIVE_APPLICATION);
+						end
+					</OnLoop>
+				</Scripts>
+			</AnimationGroup>
+		</Animations>
+	</Button>
+
+	<Button name="Q_C_GroupFinderButton" virtual="true">
+		<Size x="35" y="35"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="green" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\green"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="pupil" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\pupil"/>
+				<Texture parentKey="shine" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\shine"/>
+
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="upper" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\eyelids\upper1"/>
+				<Texture parentKey="lower" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\eyelids\lower1"/>
+
+				<Texture parentKey="Highlight" hidden="true" alpha="0" alphaMode="ADD" atlas="groupfinder-eye-highlight" useAtlasSize="true">
+					<Anchors>
+						<Anchor point="CENTER" x="0" y="1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+
+		<HighlightTexture parentKey="Light" file="Interface\Artifacts\Artifacts-PerkRing-Final-Mask" alphaMode="ADD" setAllPoints="true" />
+		<NormalTexture parentKey="Normal" file="Interface\Artifacts\Artifacts-PerkRing-Final-Mask" setAllPoints="true" />
+
+		<Animations>
+			<AnimationGroup parentKey="EyeHighlightAnim" setToFinalAlpha="true" looping="REPEAT">
+				<Scale childKey="Highlight" startDelay="0.1" smoothing="NONE" duration="1.0" order="1" fromScaleX="0.39" fromScaleY="0.39" toScaleX="1" toScaleY="1"/>
+				<Alpha childKey="Highlight" startDelay="0.1" smoothing="NONE" duration="1.0" order="1" fromAlpha="1" toAlpha="0"/>
+				<Scripts>
+					<OnLoop>
+						if ( QueueStatusMinimapButton_OnGlowPulse(self:GetParent()) ) then
+						--	PlaySound(SOUNDKIT.UI_GROUP_FINDER_RECEIVE_APPLICATION);
+						end
+					</OnLoop>
+				</Scripts>
+			</AnimationGroup>
+		</Animations>
+	</Button>
+
+
+
+
+</Ui>
