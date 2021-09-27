@@ -31,44 +31,47 @@ local events
 
 local canAutoTrack
 
-local sandCastle = LibStub("AceAddon-3.0"):GetAddon("sandCastle")
-if not sandCastle then return end
+local sandCastle --Not yet ready
+do
+-- sandCastle = LibStub("AceAddon-3.0"):GetAddon("sandCastle")
+-- if not sandCastle then return end
 
-local AddonName, sandCastle_Log = ...
+-- local AddonName, sandCastle_Log = ...
 
-function sandCastle_Log:IsEnabled()
-	-- if self.sets.disabled == true then
-		-- self:Hide()
-	-- else
-		-- self:Show()
+-- function sandCastle_Log:IsEnabled()
+	-- -- if self.sets.disabled == true then
+		-- -- self:Hide()
+	-- -- else
+		-- -- self:Show()
+	-- -- end
+	
+	-- self:SetShown(not self.sets.disabled)
+-- end
+
+-- function sandCastle_Log:Layout()
+	-- self:Rescale()
+	-- self:IsEnabled()
+-- end
+
+-- function sandCastle_Log:Rescale(newScale)
+	-- local scale = newScale or self.sets.scale or 1
+
+	-- --self.frame:SetScale(1)
+
+	-- sandCastle.FlyPaper.SetScale(self.frame, scale)
+	
+	-- if self.updateScale then
+		-- self.updateScale(scale)
 	-- end
 	
-	self:SetShown(not self.sets.disabled)
-end
+	-- sandCastle.SaveFramePosition(self)
+-- end
 
-function sandCastle_Log:Layout()
-	self:Rescale()
-	self:IsEnabled()
-end
+-- function sandCastle_Log.updateScale(scale)
 
-function sandCastle_Log:Rescale(newScale)
-	local scale = newScale or self.sets.scale or 1
-
-	--self.frame:SetScale(1)
-
-	sandCastle.FlyPaper.SetScale(self.frame, scale)
-	
-	if self.updateScale then
-		self.updateScale(scale)
-	end
-	
-	sandCastle.SaveFramePosition(self)
-end
-
-function sandCastle_Log.updateScale(scale)
+-- end
 
 end
-
 local options = {
 	{
 		"Basics",
@@ -122,7 +125,7 @@ function Questra:OnEnable()
 		do self.baseFrame = CreateFrame("Frame", "Quest_Compass_Base")
 			self.baseFrame:SetFrameStrata("BACKGROUND")
 			self.baseFrame:SetFixedFrameStrata(true)
-			self.baseFrame:SetPoint("Center")
+			self.baseFrame:SetPoint("Center", 0, -150)
 			self.baseFrame:SetSize(size, size)
 
 			self.baseFrame.dragFrame = CreateFrame("Button", "Quest_Compass_dragFrame", self.baseFrame)
@@ -406,7 +409,21 @@ function Questra:OnEnable()
 		self.itemButton:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:SetItemByID(self:GetID())
-			Questra:ShowItemButton() --update on enter, in case combat has ended
+			Questra:ShowItemButton(self:GetID()) --update on enter, in case combat has ended
+		end)
+
+		self.itemButton:SetScript("OnUpdate", function(self)
+			if self:IsVisible() and self:GetID() then
+				local start, duration, enable = GetItemCooldown(self:GetID())
+				if ( start ) then
+					CooldownFrame_Set(self.Cooldown, start, duration, enable)
+					if ( duration > 0 and enable == 0 ) then
+						SetItemButtonTextureVertexColor(self, 0.4, 0.4, 0.4)
+					else
+						SetItemButtonTextureVertexColor(self, 1, 1, 1)
+					end
+				end
+			end
 		end)
 
 		self.itemButton:SetScript("OnMouseWheel", function(self, delta)
@@ -425,38 +442,8 @@ function Questra:OnEnable()
 			self.itemButton.icon:SetSize(23, 7)
 			self.itemButton.textureHandler:SetPoint("Center", self.itemButton, 0, -3)
 		end)
-	
-		local t = CreateFrame("EditBox", "ExactLocalCoords", UIParent, "InputBoxScriptTemplate")
-		t:SetPoint("Center", UIParent)
-		t:SetAutoFocus(false)
-		t:SetSize(200, 200)
-		
-		
-		t:SetHighlightColor(.5,1,.5)
-			t:SetClampedToScreen(true)
-			t:SetJustifyH("LEFT")
-			t:SetAutoFocus(false)
-			t:SetMovable(true)
-			t:SetMultiLine(true)
-			t:SetFrameStrata("LOW")
-			t:SetFrameLevel(10)
-			t:SetFixedFrameStrata(true)
-			t:SetFontObject("GameFontNormal")
-		
-		self.baseFrame:SetScript("OnUpdate", function()
-			local x, y, id = Questra.GetPlayerPosition()
-			if (t:HasFocus() ~= true) and x and y and id then
-				x, y = floor(x*10000)/10000, floor(y*10000)/10000
-			
-			local text = [[{
-    x = ]]..x..[[,
-    y = ]]..y..[[,
-    mapID = ]]..id..[[,
-},]]
 
-			
-				t:SetText(text)
-			end
+		self.baseFrame:SetScript("OnUpdate", function()
 		
 			self:Update()
 			
@@ -477,28 +464,145 @@ function Questra:OnEnable()
 				runnin = nil
 			end
 		 end)
-			Questra:ScrollMetricIndex(0)
-			self:Update()
+		Questra:ScrollMetricIndex(0)
+		self:Update()
 	end
 
 	Questra:HookMapPins()
 
-	local frames = {Quest_Compass_Base}
-	sandCastle.New(function()
-		local testFrame = CreateFrame("Frame", "Quest_Compass_BaseContain", sandCastle.frame)
-				
-		Quest_Compass_Base:SetParent(testFrame)
-		testFrame:SetSize(Quest_Compass_Base:GetSize())
-		Quest_Compass_Base:SetAllPoints(testFrame)
+	--Questra:GetOrCreatePortalDataCollector()
 		
-		testFrame.displayID = "log"
+	if sandCastle then --not yet ready
+		-- local frames = {Quest_Compass_Base}
+		-- sandCastle.New(function()
+			-- local testFrame = CreateFrame("Frame", "Quest_Compass_BaseContain", sandCastle.frame)
+					
+			-- Quest_Compass_Base:SetParent(testFrame)
+			-- testFrame:SetSize(Quest_Compass_Base:GetSize())
+			-- Quest_Compass_Base:SetAllPoints(testFrame)
+			
+			-- testFrame.displayID = "log"
 
-		 
+			 
 
-		sandCastle:Register("sandCastle", testFrame, sandCastle_Log, defaults, options)
+			-- sandCastle:Register("sandCastle", testFrame, sandCastle_Log, defaults, options)
+			
+			-- testFrame:Layout()
+		-- end)
+	end
+end
+
+local portalDataCollector --Quick tool for collecting new portal data in the required format. So much faster this way!
+function Questra:GetOrCreatePortalDataCollector()
+	if not portalDataCollector then
+		local panel = CreateFrame("Frame", "PortalDataCollector", UIParent, "BackdropTemplate")
+		panel:SetSize(300, 200)
+		panel:SetPoint("Center", UIParent)
 		
-		testFrame:Layout()
-	end)
+		panel:EnableMouse(true)
+		panel:SetScript("OnMouseDown", function()
+			panel:SetMovable(true)
+			panel:StartMoving()
+		end)
+		panel:SetScript("OnMouseUP", function()
+			panel:StopMovingOrSizing()
+			panel:SetMovable(false)
+		end)
+		
+		panel:SetFrameStrata("Low")
+		panel:SetFrameLevel(1)
+
+		panel:SetBackdrop({
+			bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+			edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+			tile = true,
+			tileEdge = true,
+			tileSize = 32,
+			edgeSize = 16,
+			insets = { left = 3, right = 3, top = 3, bottom = 3 },
+		})
+
+		panel:SetBackdropColor(0,0,0)
+
+		panel.Set = CreateFrame("Button", panel:GetName().."Set", panel, "UIMenuButtonStretchTemplate")
+
+		panel.Set:SetSize(125, 25)
+		panel.Set:SetPoint("TopLeft", 5, -5)
+	
+		panel.Set:SetText("Set Origin")
+	
+		panel.Clear = CreateFrame("Button", panel:GetName().."ClearButton", panel, "UIMenuButtonStretchTemplate")
+		panel.Clear:SetText("Clear")
+		panel.Clear:SetSize(125, 25)
+		panel.Clear:SetPoint("TopLeft", panel.Set, "TopRight", 5, 0)
+		local t = CreateFrame("EditBox", "PortalDataCollectorDisplay", panel, "InputBoxScriptTemplate")
+		t:SetAutoFocus(false)
+		t:SetPoint("TopLeft", 5 , -30)
+		t:SetPoint("BottomRight", -5, 5)
+		t:SetHighlightColor(.5,1,.5)
+		t:SetClampedToScreen(true)
+		t:SetJustifyH("LEFT")
+		t:SetJustifyV("BOTTOM")
+		t:SetAutoFocus(false)
+		t:SetMovable(true)
+		t:SetMultiLine(true)
+		t:SetFrameStrata("LOW")
+		t:SetFrameLevel(10)
+		t:SetFixedFrameStrata(true)
+		t:SetFontObject("GameFontNormal")
+
+		t:SetScript("OnKeyDown", function(_, key)
+			if key == "DELETE" then
+				ReloadUI()
+			end
+		end)
+
+		panel.Clear:SetScript("OnClick" , function() t:SetText("") end)
+
+		local o = ""
+		local d = "{}"
+		
+
+		
+		panel.Set:SetScript("OnClick", function()
+			local x, y, id = Questra.GetPlayerPosition()
+			
+			if o == "" then
+				o = [[tooltip = "",
+            origin = {
+                x = ]]..x..[[,
+                y = ]]..y..[[,
+                mapID = ]]..id..[[,
+            }]]
+				d = "{}"
+				panel.Set:SetText("Set Destination")
+			else
+				d = [[{
+                x = ]]..x..[[,
+                y = ]]..y..[[,
+                mapID = ]]..id..[[,
+            }]]
+				panel.Set:SetText("Set Origin")
+			end
+
+			local text = [[{
+            ]]..o..[[,
+            destination = ]]..d..[[ 
+        },]]
+
+
+			t:SetText(text)
+			if o ~= "" and d ~= "{}" then
+				o, d = "", "{}"
+			end
+		end)
+
+		panel.close = CreateFrame("Button", panel:GetName().."Close", panel, "UIPanelCloseButton")
+		panel.close:SetPoint("TopRight")
+		
+		portalDataCollector = t
+	end
+	return portalDataCollector
 end
 
 do --group button
@@ -508,17 +612,10 @@ do --group button
 		if o then
 			return o
 		end
-							local info = questID and C_QuestLog.GetQuestTagInfo(questID)
-						-- .quality
-						-- .isElite
-						-- .worldQuestType
-						-- .tagID
-						-- .displayExpiration
-						-- .tagName
+		
+		local info = questID and C_QuestLog.GetQuestTagInfo(questID)
 
-					local tagID, worldQuestType, rarity, displayTimeLeft, isElite, tagName = info and info.tagID, info and info.worldQuestType, info and info.quality, info and info.displayExpiration, info and info.isElite, info and info.tagName
-
-		if worldQuestType == 6 then
+		if info and info.worldQuestType == 6 then
 			return true, true
 		end
 	end
@@ -1204,7 +1301,18 @@ do --group button
 					if btn == "RightButton" then
 						do
 							local inBattlefield, showScoreboard = QueueStatus_InActiveBattlefield()
-							if IsInLFDBattlefield() then
+							if isQueued then
+							--user is searching for group
+							self.DropDown.id = self.questID
+							QueueStatusDropDown_Show(self.DropDown, self:GetName())
+							local p1, p2 = Questra.SelectProperSide(self)
+							DropDownList1:ClearAllPoints()
+							DropDownList1:SetPoint(p2, self, p1)
+							return
+							elseif (animate == true) then
+							--user is searching for group
+
+							elseif IsInLFDBattlefield() then
 								inBattlefield = true
 								showScoreboard = true
 							end
@@ -1222,11 +1330,21 @@ do --group button
 									end
 								end
 							end
+							if IsInLFGDungeon() then
+								self.DropDown.id = self.questID
+								QueueStatusDropDown_Show(self.DropDown, self:GetName())
+								local p1, p2 = Questra.SelectProperSide(self)
+								DropDownList1:ClearAllPoints()
+								DropDownList1:SetPoint(p2, self, p1)
+								return
+							end
+							
+							
 							PVEFrame_ToggleFrame("GroupFinderFrame", "LFDParentFrame")
 							return
 						end
-							elseif ( lfgListActiveEntry ) then
-								return LFGListUtil_OpenBestWindow(true)
+					elseif ( lfgListActiveEntry ) then
+						return LFGListUtil_OpenBestWindow(true)
 					else
 						if isQueued then
 							--group full, dungeon ready to enter
@@ -1237,6 +1355,7 @@ do --group button
 							return
 						elseif (animate == true) then
 							--user is searching for group
+							self.DropDown.id = self.questID
 							QueueStatusDropDown_Show(self.DropDown, self:GetName())
 							local p1, p2 = Questra.SelectProperSide(self)
 							DropDownList1:ClearAllPoints()
@@ -1346,8 +1465,6 @@ do --group button
 		return GB.Button
 	end
 
-
-
 	function Questra:ShowGroupButton(questID)
 		local showGroup, shouldAnimate, isQueued = shouldShowAndOrAnimate()
 
@@ -1406,11 +1523,9 @@ end
 do --item button
 local  questItems = {}
 	local lastItemQuestID
-	function Questra:ShowItemButton()
-		local itemQuestID
-
+	function Questra:ShowItemButton(itemQuestID)
 		wipe(questItems)
-		
+
 		for i = 1, C_QuestLog.GetNumQuestWatches() do
 			local quest = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
 			local questLogIndex = quest and C_QuestLog.GetLogIndexForQuestID(quest)
@@ -1427,17 +1542,25 @@ local  questItems = {}
 			end
 		end
 		
-		if #questItems > 0 then
+		local index = C_QuestLog.GetLogIndexForQuestID(itemQuestID)
+		if index then
+			local link, item, charges, showItemWhenComplete = GetQuestLogSpecialItemInfo(index)
+			if link then
+				tinsert(questItems, 1, itemQuestID)
+			end	
+		end
+		if #questItems > 1 then
 			self.scroll = ( self.scroll and ((self.scroll > #questItems) and 1 or (self.scroll < 1) and #questItems)) or self.scroll or 1
-			itemQuestID = questItems[self.scroll]
+			itemQuestID = questItems[self.scroll] or itemQuestID
 		else
-			return
+			--return
 		end
 		if itemQuestID then
-			if itemQuestID ~= lastitemQuestID then --don't update if item hasn't changed.
+			--if itemQuestID ~= lastitemQuestID then --don't update if item hasn't changed.
 				lastItemQuestID = itemQuestID
 				local questLogIndex = C_QuestLog.GetLogIndexForQuestID(itemQuestID)
 				if questLogIndex then
+				--	self.itemButton:SetID(itemQuestID)
 					local link, item, charges, showItemWhenComplete = GetQuestLogSpecialItemInfo(questLogIndex)
 					if link then
 						local itemID = GetItemInfoInstant(link)
@@ -1448,26 +1571,14 @@ local  questItems = {}
 							self.itemButton.Normal:SetVertexColor(1,0,0,1)
 						end
 
-						local start, duration, enable = GetItemCooldown(itemID)
-						if ( start ) then
-							CooldownFrame_Set(self.itemButton.Cooldown, start, duration, enable)
-							if ( duration > 0 and enable == 0 ) then
-								SetItemButtonTextureVertexColor(self.itemButton, 0.4, 0.4, 0.4)
-							else
-								SetItemButtonTextureVertexColor(self.itemButton, 1, 1, 1)
-							end
-						end
 
-						if self.itemButton.lastItem ~= item then
+
+						--if self.itemButton.lastItem ~= item then
 							local itemID = GetItemInfoInstant(link)
 							self.itemButton.charges = charges
 							self.itemButton.rangeTimer = -1
 							SetItemButtonTexture(self.itemButton, item)
 							SetItemButtonCount(self.itemButton, GetItemCount(link))
-
-							
-
-							--print(GetQuestLogSpecialItemInfo(questLogIndex))
 
 							--self.itemButton.Count:SetText(GetItemCount(link))
 
@@ -1478,14 +1589,14 @@ local  questItems = {}
 							end
 							SetPortraitToTexture(self.itemButton.icon, self.itemButton.icon:GetTexture())
 
-							self.itemButton.lastItem = item
-						end
+						--	self.itemButton.lastItem = item
+						--end
 						if not InCombatLockdown() and not self.itemButton:IsShown() then
 							self.itemButton:Show()
 						end
 					end
 				end
-			end
+			--end
 		else
 			if self.itemButton and not InCombatLockdown() and self.itemButton:IsShown() then
 				self.itemButton:Hide()
@@ -1586,10 +1697,10 @@ end
 
 do --script functions
 	function Questra:BaseOnEnter()
-		if IsShiftKeyDown() then
-				self.dragFrame:Show()
-			return
-		end
+		-- if IsShiftKeyDown() then
+				-- self.dragFrame:Show()
+			-- return
+		-- end
 	end
 
 	function Questra:BaseOnLeave()
@@ -1820,7 +1931,7 @@ do --visual display update functions
 			questID = questID
 		}
 		
-		Questra:ShowGroupButton(questID)
+		--Questra:ShowGroupButton(questID)
 		--Questra:ShowItemButton(questID)
 	end
 	
@@ -1832,8 +1943,8 @@ do --visual display update functions
 			Questra:SetDisplay(x, y, id, unpack(Questra.storedUpdate))
 		end
 		
-		--Questra:ShowGroupButton(questID)
-		--Questra:ShowItemButton(questID)
+		Questra:ShowGroupButton(questID)
+		Questra:ShowItemButton(questID)
 	end
 
 	function Questra:SetDisplay(oX, oY, oID, dX, dY, dID, icon, L, R, T, B, skinDetails)
@@ -1854,7 +1965,7 @@ do --visual display update functions
 				dID = portalAvailable.origin.mapID
 			end
 			
-			local flightAvailable = Questra:GetFlight(dID, dX, dY)
+			local flightAvailable = Questra:GetFlight(dID, dX, dY) --not completely ready: sometimes inaccurate
 			if flightAvailable then			
 				Questra.portalSense = flightAvailable
 				dX = flightAvailable.origin.x
@@ -2042,11 +2153,43 @@ Questra.Events  = {
 
 }
 
-
 local eventManager = {Forced = {}, }
 
-
 do --tracking management
+	local function LinkAnywhere(mapID, x, y, questID)
+		local activeLinkWindow = ChatEdit_GetActiveWindow()
+		if activeLinkWindow then
+			local mapLink = ""
+			if x and y and mapID then
+				--normalize values
+				while x > 1 do
+					x = x / 10
+				end
+				while y > 1 do
+					y = y / 10
+				end
+			
+				--format values for the link
+				x = floor(x * 10000)
+				y = floor(y * 10000)
+				mapLink = "|cffffff00|Hworldmap:"..mapID ..":".. x ..":".. y.."|h[|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a Map Pin Location]|h|r"
+			end
+
+			local questLink = questID
+				and (GetQuestLink(questID)
+					or (C_QuestLog.IsQuestTask(questID) and C_TaskQuest.GetQuestInfoByQuestID(questID))
+					or C_QuestLog.GetTitleForQuestID(questID))
+			local questText = (questLink) and questLink or ""
+			
+			local at = (mapLink ~= "") and " @ " or ""
+			
+			
+			mapLink = mapLink or ""
+			activeLinkWindow:SetText(questText .. at ..mapLink)
+			PlaySound(SOUNDKIT.UI_MAP_WAYPOINT_CHAT_SHARE)
+		end
+	end
+	
 	local function PingAnywhere(x, y, wayMapID)
 		local sense = Questra.portalSense
 		if sense then
@@ -2062,11 +2205,11 @@ do --tracking management
 		pingAnywherePin.dataProvider = WorldMapFrame
 
 		if x and y then
-				--safety precaution
-			repeat until x < 1 do
+			--safety precaution
+			while x > 1 do
 				x = x / 10
 			end
-			repeat until y < 1 do
+			while y > 1 do
 				y = y / 10
 			end
 		
@@ -2339,7 +2482,10 @@ do --tracking management
 		
 		track.OnClick = function()
 			local userPoint = track.GetLocation()
-			if userPoint then
+			if IsControlKeyDown() then
+				local userPoint = track.GetLocation()
+				LinkAnywhere(userPoint.mapID, userPoint.x, userPoint.y)
+			elseif userPoint then
 				if userPoint.mapID and userPoint.x and userPoint.y then
 					PingAnywhere(userPoint.x, userPoint.y, userPoint.mapID)
 				end
@@ -2377,7 +2523,8 @@ do --tracking management
 			local uiMapID = GetQuestUiMapID(questID)
 						
 			local x, y, mapID
-						
+
+
 			do --waypoint check					
 				local wayID = C_QuestLog.GetNextWaypoint(questID) or uiMapID --This one can return incorrect x and y coords
 				local wayX, wayY = C_QuestLog.GetNextWaypointForMap(questID, wayID) -- Gets accurate x and y coords
@@ -2400,6 +2547,22 @@ do --tracking management
 				end
 			end
 			
+			if (not (x and y)) and QuestHasPOIInfo(questID) and C_QuestLog.IsOnMap(questID) then
+				local px, py, pID = Questra.GetPlayerPosition()
+				local nearestDist, nearest = math.huge
+				local points = QuestPOIGetSecondaryLocations(questID)
+				if points and #points > 0 then
+					for i, b in pairs(points) do
+						local compDist = HBD:GetZoneDistance(pID, b.x, b.y, pID, px, py)
+						if compDist and compDist < nearestDist then
+							nearestDist = compDist
+							x, y, mapID = b.x, b.y, pID
+						end
+					end
+				end				
+			end
+			
+			
 			if x and y and mapID then
 				--translate any waypoint located inside of a dungeon into the dungeon's entrance
 				local mapInfo = C_Map.GetMapInfo(mapID)
@@ -2413,6 +2576,9 @@ do --tracking management
 					end
 				end
 			end
+			
+			
+			
 			return {x = x, y = y, mapID = mapID}
 		end
 		
@@ -2598,12 +2764,13 @@ do --tracking management
 				return skinDetails, info.position, icon, l or 0, r or 1, t or 0, b or 1, questID
 			end
 		end
-		
+			
 		track.OnClick = function(btn)
 			local info = track.GetMetricInfo()
 			local id = info.questID
-		
-			if btn == "LeftButton" then
+			if IsControlKeyDown() then
+				LinkAnywhere(info.position and info.position.mapID, info.position and info.position.x, info.position and info.position.y, id)
+			elseif btn == "LeftButton" then
 				if (info and info.isAutoComplete) and  C_QuestLog.IsComplete(id) then
 					AutoQuestPopupTracker_RemovePopUp(id)
 					ShowQuestComplete(id)
@@ -2652,10 +2819,11 @@ do --tracking management
 										
 			local taskInfo = uiMapID and C_TaskQuest.GetQuestsForPlayerByMapID(uiMapID)
 					
-			if taskInfo then
-				for i, info in ipairs(taskInfo) do
-					local id = info.questID or info.questId
-					if id == questID then
+			-- if taskInfo then
+				-- for i, info in ipairs(taskInfo) do
+					-- local id = info.questID or info.questId
+					if questID then
+						local info = {}
 						info.title =  C_QuestLog.GetTitleForQuestID(questID) 
 						local _, factionID, capped, factionName = Questra:GetFactionInfo(questID)
 						if factionID then
@@ -2691,8 +2859,8 @@ do --tracking management
 					
 						return info
 					end
-				end
-			end
+				-- end
+			-- end
 		end
 		
 		track.OnEvent = function()
@@ -2702,7 +2870,6 @@ do --tracking management
 
 			uiMapID = digForWorldMapID(uiMapID)
 
-	
 			local taskInfo = uiMapID and C_TaskQuest.GetQuestsForPlayerByMapID(uiMapID)
 			if taskInfo then
 				for i, info in ipairs(taskInfo) do
@@ -2716,21 +2883,20 @@ do --tracking management
 					end
 				end
 			end
-		
-			local super = (C_SuperTrack.IsSuperTrackingQuest() and QuestUtils_IsQuestWorldQuest(C_SuperTrack.GetSuperTrackedQuestID())) and C_SuperTrack.GetSuperTrackedQuestID()
-			if super then
-				if not tContains(track.metrics, super) then
-					tinsert(track.metrics, super)
-				end
-			end
 			
-		
 			table.sort(track.metrics, function(a, b)
 				local adist = C_QuestLog.GetDistanceSqToQuest(a)
 				local bdist = C_QuestLog.GetDistanceSqToQuest(b)
 		
 				return (adist or math.huge) < (bdist or math.huge)
 			end)
+
+			local super = (C_SuperTrack.IsSuperTrackingQuest() and QuestUtils_IsQuestWorldQuest(C_SuperTrack.GetSuperTrackedQuestID())) and C_SuperTrack.GetSuperTrackedQuestID()
+			if super then
+				if not tContains(track.metrics, super) then
+					tinsert(track.metrics, 1, super)
+				end
+			end
 
 			return track.metrics		
 		end
@@ -2912,9 +3078,10 @@ do --tracking management
 		track.OnClick = function(btn)
 			local info = track.GetMetricInfo()
 			local id = info and info.questID
-			local isThreatQuest = C_QuestLog.IsThreatQuest(id)
-			
-			if btn == "LeftButton" then
+
+			if IsControlKeyDown() then
+				LinkAnywhere(info.position and info.position.mapID, info.position and info.position.x, info.position and info.position.y, id)
+			elseif btn == "LeftButton" then
 				--local quest = QuestCache:Get(id)
 				if (info and info.isAutoComplete) and  C_QuestLog.IsComplete(id) then
 					AutoQuestPopupTracker_RemovePopUp(id)
@@ -2927,7 +3094,7 @@ do --tracking management
 					end
 					local _ = loc and PingAnywhere(loc.x, loc.y, loc.mapID)
 				end
-			elseif not isThreatQuest then
+			elseif not C_QuestLog.IsThreatQuest(id) then
 				Questra.navButton.id = id
 				ObjectiveTracker_ToggleDropDown(Questra.navButton, BonusObjectiveTracker_OnOpenDropDown)
 				
@@ -3067,7 +3234,10 @@ do --tracking management
 		end
 		
 		track.OnClick = function(btn)
-			if btn == "LeftButton" then
+			if IsControlKeyDown() then
+				local userPoint = track.GetLocation()
+				LinkAnywhere(userPoint.mapID, userPoint.x, userPoint.y)
+			elseif btn == "LeftButton" then
 				local userPoint = track.GetLocation()
 				if userPoint then
 					local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
@@ -3217,7 +3387,10 @@ do --tracking management
 		end
 		
 		track.OnClick = function(btn)
-			if btn == "LeftButton" then
+			if IsControlKeyDown() then
+				local userPoint = track.GetLocation()
+				LinkAnywhere(userPoint.mapID, userPoint.x, userPoint.y)
+			elseif btn == "LeftButton" then
 				local userPoint = track.GetLocation()
 				if userPoint then
 					local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
@@ -3473,7 +3646,10 @@ do --tracking management
 		end
 		
 		track.OnClick = function(btn)
-			if btn == "LeftButton" then
+			if IsControlKeyDown() then
+				local userPoint = track.GetLocation()
+				LinkAnywhere(userPoint.mapID, userPoint.x, userPoint.y)
+			elseif btn == "LeftButton" then
 				local userPoint = track.GetLocation()
 				if userPoint then
 					local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
@@ -3626,7 +3802,10 @@ do --tracking management
 		end
 		
 		track.OnClick = function(btn)
-			if btn == "LeftButton" then
+			if IsControlKeyDown() then
+				local userPoint = track.GetLocation()
+				LinkAnywhere(userPoint.mapID, userPoint.x, userPoint.y)
+			elseif btn == "LeftButton" then
 				local userPoint = track.GetLocation()
 				if userPoint then
 					local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
@@ -3658,9 +3837,6 @@ do --tracking management
 			Dungeon = Enum.QuestTagType.Dungeon,
 			Raid = Enum.QuestTagType.Raid,
 		}
-		
-		
-		
 		
 		track.SetByPin = function(pin, wayType, ip)
 			local id, x, y = pin.owningMap.mapID, pin.normalizedX, pin.normalizedY
@@ -3824,13 +4000,13 @@ do --portal  transit system!
 		[13] = true,
 		[113] = true,
 		[1543] = true,
+		[203] = true,
+		[1670] = true,
 	}	
-	
 	
 	local function GetZoneIDs(baseID) --get parent zone IDS for baseID
 		if baseID and not storedIDs[baseID] then
 			local _ids = {baseID}
-
 			local info = C_Map.GetMapInfo(baseID)
 			local count 
 			while info do
@@ -3839,7 +4015,10 @@ do --portal  transit system!
 					if (info.parentMapID and tContains(_ids, info.parentMapID) or (parentInfo.mapType == Enum.UIMapType.Cosmic)) then
 						break --we've hit a repeat id or the cosmic map
 					end
-					 if (not mapOverrides[info.mapID]) and ((parentInfo.mapType ~= Enum.UIMapType.World) and (parentInfo.mapType ~= Enum.UIMapType.Cosmic))then
+					 if (not mapOverrides[info.mapID]) 
+					 and ((parentInfo.mapType ~= Enum.UIMapType.World) 
+					 and (parentInfo.mapType ~= Enum.UIMapType.Cosmic))
+					 and not tContains(_ids, info.parentMapID) then
 					
 						local _ = info.parentMapID and tinsert(_ids, info.parentMapID)
 					end
@@ -4479,7 +4658,7 @@ do --portal  transit system!
 				["x"] = 0.2034,
 				["y"] = 0.5031,
 			},
-		}, -- [50]
+		}, -- [50]	
 		{
 			["tooltip"] = "Portal to Orgrimmar",
 			["origin"] = {
@@ -4492,7 +4671,12 @@ do --portal  transit system!
 				["x"] = 0.50135588842975,
 				["y"] = 0.37890044201114,
 			},
-		}, -- [51]	
+		}, -- [51]
+		
+		
+		
+		
+		
 		-- [[
 		--zeppelins!
 		{
@@ -4521,19 +4705,7 @@ do --portal  transit system!
 				["mapID"] = 85,
 			},
 		}, -- [52]
-		{
-			["tooltip"] = "Maw of Transference",
-			["origin"] = {
-				["mapID"] = 1671,
-				["x"] = 0.5,
-				["y"] = 0.5,
-			},
-			["destination"] = {
-				x = 0.4495,
-				y = 0.4098,
-				mapID = 1543
-			},
-		}, -- [53]
+
 		{
 			["tooltip"] = "Waystone to Oribos",
 			["origin"] = {
@@ -4548,8 +4720,137 @@ do --portal  transit system!
 			},
 		}, -- [54]
 
-		--]]
+		{
+            tooltip = "Pad to Ring of Fates",
+            origin = {
+                x = 0.43374996185303,
+                y = 0.51546868982912,
+                mapID = 1671,
+            },
+            destination = {
+                x = 0.47113152833524,
+                y = 0.50293573502007,
+                mapID = 1670,
+            } 
+        },
+		{
+            tooltip = "Pad to Ring of Transference",
+            origin = {
+                x = 0.47113152833524,
+                y = 0.50293573502007,
+                mapID = 1670,
+            },
+            destination = {
+                x = 0.43374996185303,
+                y = 0.51546868982912,
+                mapID = 1671,
+            } 
+        },
+		
+		{
+            tooltip = "Pad to Ring of Transference",
+            origin = {
+                x = 0.52091740132836,
+                y = 0.42440375931766,
+                mapID = 1670,
+            },
+            destination = {
+                x = 0.49375,
+                y = 0.42007819746433,
+                mapID = 1671,
+            } 
+        },
+		{
+            tooltip = "Pad to Ring of Fates",
+            origin = {
+                x = 0.49375,
+                y = 0.42007819746433,
+                mapID = 1671,
+            },
+            destination = {
+                x = 0.52091740132836,
+                y = 0.42440375931766,
+                mapID = 1670,
+            } 
+        },
+		
+		{
+            tooltip = "Pad to Ring of Fates",
+            origin = {
+                x = 0.55656242370605,
+                y = 0.51617192913591,
+                mapID = 1671,
+            },
+            destination = {
+                x = 0.5714373387328,
+                y = 0.50366972477064,
+                mapID = 1670,
+            } 
+        },
+		{
+            tooltip = "Pad to Ring of Transference",
+            origin = {
+                x = 0.5714373387328,
+                y = 0.50366972477064,
+                mapID = 1670,
+            },
+            destination = {
+                x = 0.55656242370605,
+                y = 0.51617192913591,
+                mapID = 1671,
+            } 
+        },
+		
+		{
+            tooltip = "Pad to Ring of Transference",
+            origin = {
+                x = 0.52067281273891,
+                y = 0.57853219968463,
+                mapID = 1670,
+            },
+            destination = {
+                x = 0.49515628814697,
+                y = 0.60921867194773,
+                mapID = 1671,
+            } 
+        },
+		{
+            tooltip = "Pad to Ring of Fates",
+            origin = {
+                x = 0.49515628814697,
+                y = 0.60921867194773,
+                mapID = 1671,
+            },
+            destination = {
+                x = 0.52067281273891,
+                y = 0.57853219968463,
+                mapID = 1670,
+            } 
+        },
+
+
+		{
+			["tooltip"] = "Ring of Transference",
+			["origin"] = {
+				["mapID"] = 1671,
+				["x"] = 0.5,
+				["y"] = 0.5,
+			},
+			["destination"] = {
+				x = 0.4495,
+				y = 0.4098,
+				mapID = 1543
+			},
+		}, -- [53]
 	}
+
+
+	--portal taken monitor!
+	local portalTakenMonitor = {}
+	for i, b in pairs(networkLocations) do
+		local x, y = b.destination.x, b.destination.y
+		portalTakenMonitor[floor(x * 100)..":"..floor(y * 100)] = true
+	end
 
 	--[[
 		Enum.UIMapType = {
@@ -4571,6 +4872,16 @@ do --portal  transit system!
 			tinsert(PortalsByOrigonMapID[b], portalDetails)
 		end
 	end
+
+	local function GetPortalDetailsByID(portalID)
+		return networkLocations[portalID]
+	end
+	
+	local function GetIDByPortalDetails(portalDetails)
+		return tIndexOf(networkLocations, portalDetails)
+	end
+
+	
 
 	local noPortalOptions = {
 		[Enum.UIMapType.Dungeon] = true,
@@ -4605,7 +4916,7 @@ do --portal  transit system!
 			local oMapID = originMapParentIDs[index]
 			local lastID
 			while oMapID do
-			tinsert(duplicateCheck, oMapID)
+				tinsert(duplicateCheck, oMapID)
 				if lastID == oMapID then break end
 				local originPortals = PortalsByOrigonMapID[oMapID] --get a list of any portals available from this zone/continent/world to any other zone/continent/world
 				
@@ -4620,6 +4931,9 @@ do --portal  transit system!
 									local portalIndex = tIndexOf(networkLocations, overridePortal or originPortal)
 									if (#portalOptions < maxPortalRecommendations) and ((portalCount or 0) <= maxRecalls) then
 										tinsert(portalOptions, {portalIndex,  portalCount})
+										
+										--todo: calculate dist to player, and dist to dest, combine and replace portalCount
+										
 										noPortal = nil
 									end
 								end
@@ -4649,6 +4963,11 @@ do --portal  transit system!
 	
 	function Questra:GetPortal(destinationID)
 		local x, y, originID = Questra.GetPlayerPosition()
+		
+		if portalTakenMonitor[floor(x * 100)..":"..floor(y * 100)] then
+			storedTransit = {}
+		end
+		
 		if not storedTransit[originID..destinationID] then
 			local portalOptions = GetPortalOptions(originID, destinationID)
 			if portalOptions and #portalOptions > 0 then
@@ -4680,7 +4999,7 @@ do --flight recommendations
 					if (info.parentMapID and tContains(_ids, info.parentMapID) or (parentInfo.mapType == Enum.UIMapType.Cosmic)) then
 						break --we've hit a repeat id or the cosmic map
 					end
-					 if ((parentInfo.mapType ~= Enum.UIMapType.World) and (parentInfo.mapType ~= Enum.UIMapType.Cosmic))then
+					 if (parentInfo.mapType ~= Enum.UIMapType.Cosmic)then
 					
 						local _ = info.parentMapID and tinsert(_ids, info.parentMapID)
 					end
@@ -4692,7 +5011,6 @@ do --flight recommendations
 		return baseID and storedIDs[baseID] or {}--return then stored id
 	end
 
-
 	local function ShouldShowTaxiNode(factionGroup, taxiNodeInfo)
 		if taxiNodeInfo.faction == Enum.FlightPathFaction.Horde then
 			return factionGroup == "Horde";
@@ -4702,7 +5020,11 @@ do --flight recommendations
 			return factionGroup == "Alliance";
 		end
 		
-		return true;
+		if taxiNodeInfo.faction == Enum.FlightPathFaction.Neutral then
+			return true
+		end
+		
+		return true
 	end
 
 	local function PingFlightMapAnywhere(x, y, wayMapID)
@@ -4730,18 +5052,39 @@ do --flight recommendations
 	local one
 	local noFlyList = {}
 	
+	local storedNodes = {}
+	
+	local unlearnedPoints = {
+		
+	
+	}
+	
 	local function getNearestFlightPoint(mapID, x,  y)
 		local ClosestFlightDist, ClosestFlight = math.huge
 
-		local nodes = (FlightMapFrame and FlightMapFrame:IsShown()) and C_TaxiMap.GetAllTaxiNodes(mapID) or C_TaxiMap.GetTaxiNodesForMap(mapID)
+		local nodesToStore = (FlightMapFrame and FlightMapFrame:IsShown()) and C_TaxiMap.GetAllTaxiNodes(mapID)
+		if nodesToStore then
+			storedNodes[mapID] = nodesToStore
+		end
+		unlearnedPoints[mapID] = unlearnedPoints[mapID] or {}
+		
+		local nodes = storedNodes[mapID] --or C_TaxiMap.GetTaxiNodesForMap(mapID)		
+		
 		if nodes and (#nodes > 0) then
 			for index, taxiNodeInfo in pairs(nodes) do
-				if ShouldShowTaxiNode(UnitFactionGroup("player"), taxiNodeInfo) then
-					if taxiNodeInfo.position then--and ((not taxiNodeInfo.state) or (taxiNodeInfo.state == 1)) then
-						local compDist = HBD:GetZoneDistance(mapID, x, y, mapID, taxiNodeInfo.position.x, taxiNodeInfo.position.y)
-						if ClosestFlightDist > compDist then
-							ClosestFlightDist, ClosestFlight = compDist, taxiNodeInfo
-							taxiNodeInfo.position.mapID = mapID
+				if taxiNodeInfo.name then
+					if ShouldShowTaxiNode(UnitFactionGroup("player"), taxiNodeInfo) then
+						if taxiNodeInfo.position then
+							if nodesToStore then
+								unlearnedPoints[mapID][taxiNodeInfo.name] = TaxiNodeGetType(index)
+							end
+							if (unlearnedPoints[mapID][taxiNodeInfo.name] ~= "DISTANT") or (unlearnedPoints[mapID][taxiNodeInfo.name] ~= "NONE") then
+								local compDist = HBD:GetZoneDistance(mapID, x, y, mapID, taxiNodeInfo.position.x, taxiNodeInfo.position.y)
+								if ClosestFlightDist > compDist then
+									ClosestFlightDist, ClosestFlight = compDist, taxiNodeInfo
+									taxiNodeInfo.position.mapID = mapID
+								end
+							end
 						end
 					end
 				end
@@ -4755,16 +5098,16 @@ do --flight recommendations
 		if UnitOnTaxi("player") then return  end
 		local x, y, originID = Questra.GetPlayerPosition()
 		
-		if noFly[originID..destinationID] then
-			return 
-		end
+		-- if noFly[originID..destinationID] then
+			-- return 
+		-- end
 		
 		local oIDS = GetZoneIDs(originID)
 		local isAzeroth = tContains(oIDS, 947)
 		local dIDS 
 		if isAzeroth then
-			oIDS = Questra:GetZoneIDs(originID)
-			dIDS = Questra:GetZoneIDs(destinationID)
+			oIDS = Questra.GetZoneIDs(originID)
+			dIDS = Questra.GetZoneIDs(destinationID)
 		else
 			dIDS = GetZoneIDs(destinationID)
 		end
@@ -4799,7 +5142,10 @@ do --flight recommendations
 						end
 					else
 						one = nil
-					end				
+					end					
+
+					--nearestOriginFlight.position.mapID = (nearestOriginFlight.position.mapID == 1670) and 1671 or nearestOriginFlight.position.mapID
+										
 					return {origin = {
 							x = nearestOriginFlight.position.x,
 							y = nearestOriginFlight.position.y,
@@ -4809,7 +5155,7 @@ do --flight recommendations
 					}
 				end
 			else			
-				noFly[originID..destinationID] = true
+				--noFly[originID..destinationID] = true
 			end
 		end
 	end
