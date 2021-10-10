@@ -13,7 +13,6 @@ local HBD = LibStub:GetLibrary("HereBeDragons-2.0", true)
 local prin = print
 local lastPrint
 local function print(...)
-prin(...)
 	local p  = {...}
 	local isRepeatPrint
 	local newPrint = strjoin(", ", unpack(p))
@@ -379,6 +378,19 @@ function Questra:OnEnable()
 			--self.waypointMarker:SetTexture("Interface\\BUTTONS\\UI-StopButton")
 			self.waypointMarker:SetSize(25, 25)
 		end
+	
+		do--tracking quantity
+			self.qtyText = self.navButton:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+			self.qtyText:SetPoint("BottomRight", self.navButton, "Top", 0, -5)
+			
+			local path = self.qtyText:GetFont() -- Return the font path, height, and flags that may be used to construct an identical Font object.
+			self.qtyText:SetFont(path, 6) --don't want to change font, just size.
+			self.qtyText:SetWordWrap(false)
+			self.qtyText:SetText(" ")
+			self.qtyText:SetJustifyH("RIGHT")
+			--self.qtyText:SetWidth(35)
+		
+		end
 	end
 
 	do  --Scripts
@@ -612,10 +624,17 @@ do --group button
 		if o then
 			return o
 		end
-		
-		local info = questID and C_QuestLog.GetQuestTagInfo(questID)
+							local info = questID and C_QuestLog.GetQuestTagInfo(questID)
+						-- .quality
+						-- .isElite
+						-- .worldQuestType
+						-- .tagID
+						-- .displayExpiration
+						-- .tagName
 
-		if info and info.worldQuestType == 6 then
+					local tagID, worldQuestType, rarity, displayTimeLeft, isElite, tagName = info and info.tagID, info and info.worldQuestType, info and info.quality, info and info.displayExpiration, info and info.isElite, info and info.tagName
+
+		if worldQuestType == 6 then
 			return true, true
 		end
 	end
@@ -645,7 +664,7 @@ do --group button
 
 	local function QuickJoinToastMixin_OnEnter(button, questID, queued)
 		if not questID then
-			return 
+			return --print(button, questID)
 		end
 		local canMake = C_LFGList.CanCreateQuestGroup(questID)
 
@@ -692,24 +711,7 @@ do --group button
 		end
 	end
 
-	local accept
-
-
-	local categories = {}
-	local function GetInstanceIDByName(name, zoneID)
-		do --dungeon
-			local dungeonList = GetLFDChoiceOrder();
-			for _, dungeonID in ipairs(dungeonList) do
-				if (not LFGLockList) or (not LFGLockList[dungeonID] or not LFGLockList[dungeonID].hideEntry) then
-					local details = C_LFGInfo.GetDungeonInfo(dungeonID)
-					if details and details.name == name then
-						return dungeonID, i
-					end
-				end
-			end
-		end
-
-
+	local function GetInstanceIDByName(zoneID, name)
 		local dungeonEntrances = C_EncounterJournal.GetDungeonEntrancesForMap(zoneID)
 		for i, b in pairs(dungeonEntrances) do
 			if b.name == name then
@@ -1192,6 +1194,7 @@ do --group button
 		return showButton, isQueued or animateEye,  isQueued
 	end
 
+	local accept
 	local dungeonTitle = ""
 	local _text = ""
 	_G.StaticPopupDialogs.ConfirmDungeonEntry = {
@@ -1528,21 +1531,23 @@ local  questItems = {}
 
 		for i = 1, C_QuestLog.GetNumQuestWatches() do
 			local quest = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
-			local questLogIndex = quest and C_QuestLog.GetLogIndexForQuestID(quest)
-			
-			if questLogIndex then
-				local link, item, charges, showItemWhenComplete = GetQuestLogSpecialItemInfo(questLogIndex)
-				if link then
-					if itemQuestID == quest then
-						tinsert(questItems, 1, quest)
-					else
-						tinsert(questItems, quest)
+			if quest then
+				local questLogIndex = quest and C_QuestLog.GetLogIndexForQuestID(quest)
+				
+				if questLogIndex then
+					local link, item, charges, showItemWhenComplete = GetQuestLogSpecialItemInfo(questLogIndex)
+					if link then
+						if itemQuestID == quest then
+							tinsert(questItems, 1, quest)
+						else
+							tinsert(questItems, quest)
+						end
 					end
 				end
 			end
 		end
 		
-		local index = C_QuestLog.GetLogIndexForQuestID(itemQuestID)
+		local index = itemQuestID and C_QuestLog.GetLogIndexForQuestID(itemQuestID)
 		if index then
 			local link, item, charges, showItemWhenComplete = GetQuestLogSpecialItemInfo(index)
 			if link then
@@ -1782,9 +1787,8 @@ do --map shortcuts
 	end
 
 	function Questra:GetViewedMapID()
-		local view = _G["WorldMapFrame"]:GetMapID()
+		local view = _G["WorldMapFrame"]:GetMapID() or MapUtil.GetDisplayableMapForPlayer()
 		local _, _, world = Questra:GetWorldID(view)
-
 
 		local zoneName = GetRealZoneText(view)
 		if IsInInstance() then
@@ -1798,7 +1802,7 @@ do --map shortcuts
 			end
 		end
 
-		if WorldMapFrame:IsVisible() then
+		if view then
 			return view, world
 		else
 			return self:GetPlayerMapID()
@@ -1910,10 +1914,15 @@ do --visual display update functions
 	function Questra:CollectUpdate()
 		local tracker = Questra:GetTracked()
 				
-		local skinDetails, position, texture, l, r, t, b, questID = Questra.basicSkin, nil, nil, 0, 1, 0, 1, nil
+		local skinDetails, position, texture, l, r, t, b, extra = Questra.basicSkin, nil, nil, 0, 1, 0, 1, nil
 		if tracker then
-			skinDetails, position, texture, l, r, t, b, questID  = tracker.GetIconInfo()
+			skinDetails, position, texture, l, r, t, b, extra  = tracker.GetIconInfo()
+			
+			
+			Questra.qtyText:SetText(tracker.GetScrollValue().." / "..#tracker.metrics)
 		else
+		
+			Questra.qtyText:SetText("")
 			self.navButton.icon:SetTexture("")
 			self.navButton.icon:SetTexCoord(0,1,0,1)
 			self.distanceText:SetText("")
@@ -1928,26 +1937,34 @@ do --visual display update functions
 			texture,
 			l, r, t, b,
 			skinDetails,
-			questID = questID
+			extra,
+			questID = (extra and type(extra) ~= "boolean") and extra or nil,
 		}
 		
-		--Questra:ShowGroupButton(questID)
-		--Questra:ShowItemButton(questID)
+		
+		--Questra:ShowGroupButton(extra)
+		--Questra:ShowItemButton(extra)
 	end
 	
 	function Questra:Update()
 		local  x, y, id = Questra.GetPlayerPosition()
 		local questID
+
+		
 		if Questra.storedUpdate then
 			questID = Questra.storedUpdate.questID
 			Questra:SetDisplay(x, y, id, unpack(Questra.storedUpdate))
+			
+			if Questra.storedUpdate then
+
+			end
 		end
 		
 		Questra:ShowGroupButton(questID)
 		Questra:ShowItemButton(questID)
 	end
 
-	function Questra:SetDisplay(oX, oY, oID, dX, dY, dID, icon, L, R, T, B, skinDetails)
+	function Questra:SetDisplay(oX, oY, oID, dX, dY, dID, icon, L, R, T, B, skinDetails, extra)
 		if oX and oY and self.coordText:HasFocus() ~= true then
 			self.coordText:SetText(floor(oX*10000)/100 ..", "..floor(oY*10000)/100)
 		end
@@ -2036,10 +2053,13 @@ do --visual display update functions
 		
 		if type(icon) == "string" then
 			self.navButton.icon:SetAtlas(icon)
+			--prin("atlas")
 		else
-			self.navButton.icon:SetTexture(icon)
+			--self.navButton.icon:SetTexture(icon)
+			--prin("texture")
 		end
-		self.navButton.icon:SetTexCoord(L or 0, R or 1, T or 0, B or 1)
+		--prin(L or 0, R or 1, T or 0, B or 1)
+		--self.navButton.icon:SetTexCoord(L or 0, R or 1, T or 0, B or 1)
 		
 		Questra.tracking[Questra:GetTracking()].portal = Questra.portalSense
 	end
@@ -2190,6 +2210,7 @@ do --tracking management
 		end
 	end
 	
+	local pingAnywherePin,  lastPing
 	local function PingAnywhere(x, y, wayMapID)
 		local sense = Questra.portalSense
 		if sense then
@@ -2199,10 +2220,7 @@ do --tracking management
 		--handy tool derived from: "Interface\AddOns\Blizzard_SharedMapDataProviders\WorldQuestDataProvider.lua"
 		OpenWorldMap(wayMapID)
 
-		pingAnywherePin = pingAnywherePin or WorldMapFrame:AcquirePin("WorldQuestPingPinTemplate")
-
-		pingAnywherePin:Stop()
-		pingAnywherePin.dataProvider = WorldMapFrame
+		pingAnywherePin = pingAnywherePin or WorldMapFrame:AcquirePin("QuestraPingPinTemplate")
 
 		if x and y then
 			--safety precaution
@@ -2212,14 +2230,15 @@ do --tracking management
 			while y > 1 do
 				y = y / 10
 			end
-		
-			pingAnywherePin.textureSet = ((not pingAnywherePin.textureSet) and pingAnywherePin.Expand:SetAtlas("ArtifactsFX-Whirls")) and true --just to be different
-			pingAnywherePin:Show();
-			pingAnywherePin:SetPosition(x, y);
-			pingAnywherePin.DriverAnimation:Play();
-			pingAnywherePin.ScaleAnimation:Play();
+			if (not pingAnywherePin.DriverAnimation:IsPlaying()) or lastPing ~= x..y..wayMapID then
+				pingAnywherePin:Show()
+				pingAnywherePin:GetMap():SetPinPosition(pingAnywherePin, x, y)
+				pingAnywherePin.DriverAnimation:Play()
+				lastPing = x..y..wayMapID
+			end
 		else
-			pingAnywherePin:Stop();
+			pingAnywherePin.DriverAnimation:Stop()
+			pingAnywherePin:Hide()
 		end
 	end
 	
@@ -2751,10 +2770,10 @@ do --tracking management
 
 				local icon, l, r, t, b = display(info.tagInfo and info.tagInfo.tagID)
 						
-				local bachgroundTexture, bachgroundColor = unpack(Questra.questQualityTextures[0])
+				local backgroundTexture, bachgroundColor = unpack(Questra.questQualityTextures[0])
 
 				local skinDetails = {
-						bachgroundTexture,
+						backgroundTexture,
 						{.09, 1 - .09, .09, 1 - .09},
 						{-.09, 1.09, 0 - .09, 1.09},
 						{unpack(bachgroundColor or {1, 1, 1, 1})},
@@ -3013,10 +3032,10 @@ do --tracking management
 							
 				local rarity = info.tagInfo.quality or 0
 		
-				local bachgroundTexture, bachgroundColor = unpack(Questra.questQualityTextures[rarity] or Questra.questQualityTextures[0])
+				local backgroundTexture, bachgroundColor = unpack(Questra.questQualityTextures[rarity] or Questra.questQualityTextures[0])
 				
 				local skinDetails = {
-						bachgroundTexture,
+						backgroundTexture,
 						{.09, 1 - .09, .09, 1 - .09},
 						{-.09, 1.09, 0 - .09, 1.09},
 						{unpack(bachgroundColor or {1, 1, 1, 1})},
@@ -3168,7 +3187,12 @@ do --tracking management
 						GameTooltip:SetText("Waypoint", 1, 1, 1)
 						GameTooltip:AddLine("Were you going somewhere?", 1, 1, 1)
 					end 
-					
+
+
+					if Questra.portalSense then
+						GameTooltip:AddLine("Take the "..Questra.portalSense.tooltip)
+					end
+
 					local mapInfo = C_Map.GetMapInfo(tonumber(id))
 					
 					if Questra.portalSense then
@@ -3345,10 +3369,6 @@ do --tracking management
 					if Questra.portalSense then
 						GameTooltip:AddLine("Take the "..Questra.portalSense.tooltip)
 					end	
-					
-					if userPoint.tooltip then
-						GameTooltip:SetText(userPoint.tooltip, 1, 1, 1)
-					end 
 					
 					local mapInfo = C_Map.GetMapInfo(tonumber(id))
 										
@@ -3750,27 +3770,68 @@ do --tracking management
 		
 			local userPoint = track.GetMetricInfo()
 			if userPoint then
-				local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
-				if id and x and y then	
-		
-					GameTooltip:SetOwner(Questra.navButton, "ANCHOR_LEFT")
-						
-					GameTooltip:SetText(userPoint.tooltip or "Instance", 1, 1, 1)
-					
-					if Questra.portalSense then
-						GameTooltip:AddLine("Take the "..Questra.portalSense.tooltip)
-					end
+				if userPoint.questID then
+					local info = userPoint
+					--if info and info.title then
+						GameTooltip:Hide()
+						GameTooltip:SetOwner(Questra.navButton, "ANCHOR_LEFT")
 
-					
-					local mapInfo = C_Map.GetMapInfo(tonumber(id))
-										
-					if userPoint.title then
-						GameTooltip:AddDoubleLine(userPoint.title)
+						GameTooltip:SetText(info.title, info.difficultyColor.r, info.difficultyColor.g, info.difficultyColor.b)
+
+						if Questra.portalSense then
+							GameTooltip:AddLine("Take the "..Questra.portalSense.tooltip)
+						end
+
+						local mapInfo = info.position and info.position.mapID and C_Map.GetMapInfo(info.position.mapID) or info.mapID and C_Map.GetMapInfo(info.mapID)
+						local _ = mapInfo and GameTooltip:AddLine(mapInfo.name, (info.position and info.position.mapID or info.mapID) ~= Questra:GetPlayerMapID()and unpack({1,0,0,1})) 
+
+						QuestUtils_AddQuestTypeToTooltip(GameTooltip, info.questID, NORMAL_FONT_COLOR)
+
+						local _ = info.questDescription and GameTooltip:AddLine(info.questDescription, 1, 1, 1, true)
+						local _ = info.questDescription and GameTooltip_AddBlankLinesToTooltip(GameTooltip, 1)
+
+						for i, text in pairs(info.objectives) do
+							local text, r, g, b, bool = text, 1, 1, 1, true
+							if type(text) == "table" then
+								text, r, b, g, bool = unpack(text)
+							end
+						
+							if text ~= info.questDescription then
+								GameTooltip:AddLine(QUEST_DASH..text, r, g, b, bool)
+							end
+						end
+											
+						local _ = ( info.percent and info.percent > 0) and GameTooltip_ShowProgressBar(GameTooltip, 0, 100, info.percent, PERCENTAGE_STRING:format(info.percent))
+
+						Questra:AddRewardsToTooltip(GameTooltip, info.questID)
+						
+						GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
+						GameTooltip:Show()
+					--end
+				else
+				
+					local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
+					if id and x and y then	
+			
+						GameTooltip:SetOwner(Questra.navButton, "ANCHOR_LEFT")
+							
+						GameTooltip:SetText(userPoint.tooltip or "Instance", 1, 1, 1)
+						
+						if Questra.portalSense then
+							GameTooltip:AddLine("Take the "..Questra.portalSense.tooltip)
+						end
+
+						
+						local mapInfo = C_Map.GetMapInfo(tonumber(id))
+											
+						if userPoint.title then
+							GameTooltip:AddDoubleLine(userPoint.title)
+						end
+						GameTooltip:AddDoubleLine(mapInfo.name..":", x*100 .. ", ".. y  * 100)
+						
+						GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
+						GameTooltip:Show()
 					end
-					GameTooltip:AddDoubleLine(mapInfo.name..":", x*100 .. ", ".. y  * 100)
-					
-					GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
-					GameTooltip:Show()
 				end
 			end
 		end
@@ -3789,13 +3850,35 @@ do --tracking management
 				local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
 				if id and x and y then
 					local icon = userPoint.icon
-					if type(icon) ~= "table" then
+					if userPoint.questID then
+						local questID = userPoint.questID
+
+						local info = userPoint
+						local display = info.complete and Questra.iconDisplayInfo["complete"]
+							or Questra.iconDisplayInfo[info.tagInfo and Enum.QuestTagType[info.tagInfo.tagName]]
+							or Questra.iconDisplayInfo["normal"]
+							
+						local icon, l, r, t, b = display(info.tagInfo and info.tagInfo.tagID)
+								
+						local backgroundTexture, bachgroundColor = unpack(Questra.questQualityTextures[0])
+
+						local skinDetails = {
+								backgroundTexture,
+								{.09, 1 - .09, .09, 1 - .09},
+								{-.09, 1.09, 0 - .09, 1.09},
+								{unpack(bachgroundColor or {1, 1, 1, 1})},
+								{unpack(bachgroundColor or {1, 1, 1, 1})},
+							}
+
+						return skinDetails, info.position or info, icon, l or 0, r or 1, t or 0, b or 1, questID
+					elseif type(icon) ~= "table" then
 						return Questra.basicSkin, {x = x, y = y, mapID = id}, Questra.iconDisplayInfo[icon] and Questra.iconDisplayInfo[icon]()
 					else
 					
-						local icon, coord = unpack(icon)
 					
-						return Questra.basicSkin, {x = x, y = y, mapID = id}, icon, unpack(coord)
+						local icon, coord, isTexture = unpack(icon)
+						local l, r, t, b = unpack(coord)
+						return Questra.basicSkin, {x = x, y = y, mapID = id}, icon, l, r, t, b, isTexture
 					end
 				end
 			end
@@ -3836,36 +3919,145 @@ do --tracking management
 			[177] = "dig",
 			Dungeon = Enum.QuestTagType.Dungeon,
 			Raid = Enum.QuestTagType.Raid,
+			QuestDaily = "daily",
+			QuestNormal = "normal",
 		}
 		
-		track.SetByPin = function(pin, wayType, ip)
+		track.SetByPin = function(pin, wayType, template)
 			local id, x, y = pin.owningMap.mapID, pin.normalizedX, pin.normalizedY
 			
-			local det = unpack(pin.__details)
+			local texture = pin.Texture and (pin.Texture:GetTexture())
+			local atlas = pin.Texture and (pin.Texture:GetAtlas())
+
+			local iconType, iconTexture, iconCoords
+
+			if  pin:GetNumRegions() > 0 then
+				for o, l in pairs({pin:GetRegions()}) do
+					if type(l) == "table" then
+					
+						if l.GetTexture and l:GetTexture() and not iconType then
+							iconTexture = l:GetTexture()
+							iconType = "texture"
+							iconCoords = {l:GetTexCoord()}
+						end					
+						if l.GetAtlas and l:GetAtlas()  and iconType ~= "atlas"then
+							iconTexture = l:GetAtlas()
+							iconType = "atlas"
+							iconCoords = {l:GetTexCoord()}
+						end
+					end				
+				end
+			end
+
+			if  pin:GetNumChildren() > 0 then
+				for o, l in pairs({pin:GetChildren()}) do
+					if type(l) == "table" then
+					
+						if l.GetTexture and l:GetTexture() and not iconType then
+							iconTexture = l:GetTexture()
+							iconType = "texture"
+							iconCoords = {l:GetTexCoord()}
+						end					
+						if l.GetAtlas and l:GetAtlas()  and iconType ~= "atlas"then
+							iconTexture = l:GetAtlas()
+							iconType = "atlas"
+							iconCoords = {l:GetTexCoord()}
+						end
+					end				
+				end
+			end
 			
+			prin(iconType, iconTexture)
+			
+			local det = unpack(pin.__details)
+					
+
+
 			local poiInfo = (type(det) == "table") and det or nil
 
 			local name = pin.name 
 			--local instanceID = pin.journalInstanceID
 			local description = poiInfo and poiInfo.name or "Other"
 			
+	
 			
-			--print(unpack(pin.__details))
-			
-			local icon = pin.Texture and tonumber(pin.Texture:GetTexture()) or (pin.description) and string.lower(pin.description) or "way"
+			local icon = iconTexture or "way"
 
+			local coord = iconCoords or {0,1,0,1}
 			
-			local texture = pin.Texture and pin.Texture:GetTexture()
-			local coord = poiInfo and {GetPOITextureCoords(poiInfo.textureIndex)} or pin.Texture and {pin.Texture:GetTexCoord()} or {0,1,0,1}
+			
+			local atlas
+			
+			if iconType == "atlas" then
+				atlas = icon
+			end
+			
+			local pinTexture = templateToTrackingType[icon] or atlas or {icon, coord} 
 			
 			local metric = id..x..y
-			
-			local pinTexture = poiInfo and templateToTrackingType[poiInfo.textureIndex or poiInfo.atlasName] or {icon or texture, coord}
-			
-			if not coord then return end
-			
 			if metric and not track.referenceDetails[metric] then
-				local details = {x = floor(x*10000) / 10000 , y = floor(y*10000) / 10000 , mapID = id, title = name, tooltip = description, icon = pinTexture, _time = GetTime()}
+				local details = {x = floor(x*10000) / 10000 , y = floor(y*10000) / 10000 , mapID = id, title = name, tooltip = description, icon = pinTexture, _time = GetTime(), questID = pin.questID}
+				local questID = pin.questID
+
+				if questID then
+					local info = details
+					--[[info = {
+							title,
+							questLogIndex,
+							questID,
+							campaignID,
+							level,
+							difficultyLevel,
+							suggestedGroup,
+							frequency,  -- QuestFrequency
+							isHeader,
+							isCollapsed,
+							startEvent,
+							isTask,
+							isBounty,
+							isStory,
+							isScaling,
+							isOnMap,
+							hasLocalPOI,
+							isHidden,
+							isAutoComplete,
+							overridesSortOrder,
+							readyForTranslation,
+						}
+					--]]
+
+				local waytext = C_QuestLog.GetNextWaypointText(questID)
+
+				info.objectives = info.objectives or {}
+				
+				wayText =  waytext and WAYPOINT_OBJECTIVE_FORMAT_OPTIONAL:format(waytext)
+				if waytext and not tContains(info.objectives, wayText) then
+					tinsert(info.objectives, wayText)
+				end
+				
+				for index = 1, C_QuestLog.GetNumQuestObjectives(questID) do
+					local text, objectiveType, finished, fulfilled, required = GetQuestObjectiveInfo(questID, index, false)
+					if text and not tContains(info.objectives, text) then
+						tinsert(info.objectives, text)
+					end
+				end
+				
+				info.difficultyColor  = GetDifficultyColor(C_PlayerInfo.GetContentDifficultyQuestForPlayer(questID))
+				info.distance, info.onContinent = C_QuestLog.GetDistanceSqToQuest(questID)
+				info.percent = GetQuestProgressBarPercent(questID)	
+				info.complete = C_QuestLog.IsComplete(questID)
+				info.position = track.GetLocation(questID)
+				info.tagInfo = C_QuestLog.GetQuestTagInfo(questID)
+				
+				local questTitle, factionID, capped, displayAsObjective = C_TaskQuest.GetQuestInfoByQuestID(questID)		
+						
+				info.title = questTitle
+				info.factionID = factionID
+				info.capped = capped
+				info.displayAsObjective = displayAsObjective
+						
+			end
+
 				tinsert(track.metrics, 1, details)
 				details.referenceDetailsIndex = metric
 				track.referenceDetails[metric] = details
@@ -3894,7 +4086,6 @@ do --hook map pins
 		["FlightPointPinTemplate"] = "flight",
 		--["DungeonEntrancePinTemplate"] = "dungeon",
 		["Other"] = "other",
-		
 	}
 
 	local tempClicks = {
@@ -3917,7 +4108,7 @@ do --hook map pins
 					local tracker =  Questra.trackByName["other"]
 				
 					Questra:UpdateAutoTracking()
-					tracker.SetByPin(pin, trackingName)
+					tracker.SetByPin(pin, trackingName, template)
 				--end
 			end
 		end	
@@ -4002,8 +4193,8 @@ do --portal  transit system!
 		[1543] = true,
 		[203] = true,
 		[1670] = true,
+		--[1671] = true,
 	}	
-	
 	local function GetZoneIDs(baseID) --get parent zone IDS for baseID
 		if baseID and not storedIDs[baseID] then
 			local _ids = {baseID}
@@ -4029,956 +4220,957 @@ do --portal  transit system!
 		end
 		return baseID and storedIDs[baseID] or {}--return then stored id
 	end
-
 	Questra.GetZoneIDs = GetZoneIDs
 
+	--List all known portals(no alliance only data has been collected yet.)
 	local networkLocations = {
-		--These were manually collected. I traveled Azeroth and beyond to record each portal location!
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.53492878438869,
-				["x"] = 0.73593721339996,
-				["mapID"] = 241,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.37890044201114,
+				mapID = 85,
+				x = 0.50135588842975,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.50135588842975,
-				["y"] = 0.37890044201114,
+			origin = {
+				y = 0.57890164852142,
+				x = 0.33675336837769,
+				mapID = 619,
 			},
 		}, -- [1]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.79655785617416,
-				["x"] = 0.56321089764031,
-				["mapID"] = 245,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.4764620014373,
-				["y"] = 0.39140493181188,
+			origin = {
+				y = 0.5475,
+				x = 0.2089,
+				mapID = 1670,
 			},
 		}, -- [2]
 		{
-			["tooltip"] = "Portal to HellFire Peninsula, Outland",
-			["origin"] = {
-				["y"] = 0.17035557881295,
-				["x"] = 0.85221381072501,
-				["mapID"] = 90,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 100,
-				["x"] = 0.89162719838972,
-				["y"] = 0.49560798548094,
+			origin = {
+				y = 0.098700038554703,
+				x = 0.63762695780944,
+				mapID = 1530,
 			},
 		}, -- [3]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.18680549839493,
-				["x"] = 0.58536847841333,
-				["mapID"] = 110,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.14021435795428,
+				x = 0.28511899099554,
+				mapID = 371,
 			},
 		}, -- [4]
 		{
-			["tooltip"] = "Portal to Zuldazar",
-			["origin"] = {
-				["y"] = 0.62772743942331,
-				["x"] = 0.4727348470357,
-				["mapID"] = 1355,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 1163,
-				["x"] = 0.70333319769965,
-				["y"] = 0.68583374023438,
+			origin = {
+				y = 0.41296159312871,
+				x = 0.46663798048915,
+				mapID = 630,
 			},
 		}, -- [5]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.49464972688152,
-				["x"] = 0.89232424936608,
-				["mapID"] = 100,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.2395178315967,
+				x = 0.55211635002278,
+				mapID = 627,
 			},
 		}, -- [6]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.51649872833174,
-				["x"] = 0.60789520263672,
-				["mapID"] = 624,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.267044943523,
+				x = 0.58198599758397,
+				mapID = 74,
 			},
 		}, -- [7]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.48866477166798,
-				["x"] = 0.56823639354067,
-				["mapID"] = 111,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.24446088576159,
+				x = 0.63479490345888,
+				mapID = 198,
 			},
 		}, -- [8]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.53103871944398,
-				["x"] = 0.50934902393179,
-				["mapID"] = 207,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.25476156859977,
+				x = 0.55301410416057,
+				mapID = 125,
 			},
 		}, -- [9]
 		{
-			["tooltip"] = "Banshee's Wail to Drustvar",
-			["origin"] = {
-				["y"] = 0.62980799772618,
-				["x"] = 0.58454345381237,
-				["mapID"] = 862,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 896,
-				["x"] = 0.20607681440632,
-				["y"] = 0.43693684881455,
+			origin = {
+				y = 0.70166727701823,
+				x = 0.73611111111111,
+				mapID = 1163,
 			},
 		}, -- [10]
 		{
-			["tooltip"] = "Banshee's Wail to Stormsong Valley",
-			["origin"] = {
-				["y"] = 0.62980799772618,
-				["x"] = 0.58454345381237,
-				["mapID"] = 862,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 942,
-				["x"] = 0.51058783027949,
-				["y"] = 0.31070487254826,
+			origin = {
+				y = 0.53103871944398,
+				x = 0.50934902393179,
+				mapID = 207,
 			},
 		}, -- [11]
 		{
-			["tooltip"] = "Banshee's Wail to Tiragarde Sound",
-			["origin"] = {
-				["y"] = 0.62980799772618,
-				["x"] = 0.58454345381237,
-				["mapID"] = 862,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 895,
-				["x"] = 0.88203434638142,
-				["y"] = 0.51159193712012,
+			origin = {
+				y = 0.48866477166798,
+				x = 0.56823639354067,
+				mapID = 111,
 			},
 		}, -- [12]
 		{
-			["tooltip"] = "Portal to Nazjatar",
-			["origin"] = {
-				["y"] = 0.85333353678385,
-				["x"] = 0.62999979654948,
-				["mapID"] = 1163,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 1355,
-				["x"] = 0.47193758468472,
-				["y"] = 0.6262505365728,
+			origin = {
+				y = 0.51649872833174,
+				x = 0.60789520263672,
+				mapID = 624,
 			},
 		}, -- [13]
 		{
-			["tooltip"] = "Portal to Silithus",
-			["origin"] = {
-				["y"] = 0.85416666666667,
-				["x"] = 0.73611111111111,
-				["mapID"] = 1163,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 81,
-				["x"] = 0.41537530710609,
-				["y"] = 0.44943381928406,
+			origin = {
+				y = 0.49464972688152,
+				x = 0.89232424936608,
+				mapID = 100,
 			},
 		}, -- [14]
 		{
-			["tooltip"] = "Portal to Thunder Bluff",
-			["origin"] = {
-				["y"] = 0.775,
-				["x"] = 0.73666653103299,
-				["mapID"] = 1163,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.89813858019974,
+				mapID = 85,
+				x = 0.57103620194035,
 			},
-			["destination"] = {
-				["mapID"] = 88,
-				["x"] = 0.22214766105373,
-				["y"] = 0.1687186758094,
+			origin = {
+				y = 0.18680549839493,
+				x = 0.58536847841333,
+				mapID = 110,
 			},
 		}, -- [15]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.70166727701823,
-				["x"] = 0.73611111111111,
-				["mapID"] = 1163,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.39140493181188,
+				mapID = 85,
+				x = 0.4764620014373,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.79655785617416,
+				x = 0.56321089764031,
+				mapID = 245,
 			},
 		}, -- [16]
 		{
-			["tooltip"] = "Portal to Silvermoon City",
-			["origin"] = {
-				["y"] = 0.62250061035156,
-				["x"] = 0.73944430881076,
-				["mapID"] = 1163,
+			tooltip = "Portal to Orgrimmar",
+			destination = {
+				y = 0.37890044201114,
+				mapID = 85,
+				x = 0.50135588842975,
 			},
-			["destination"] = {
-				["mapID"] = 110,
-				["x"] = 0.58264465141624,
-				["y"] = 0.19238329952114,
+			origin = {
+				y = 0.53492878438869,
+				x = 0.73593721339996,
+				mapID = 241,
 			},
 		}, -- [17]
 		{
-			["tooltip"] = "Greasy Eel to Mechagon",
-			["origin"] = {
-				["y"] = 0.87604148782861,
-				["x"] = 0.41825685012782,
-				["mapID"] = 1165,
+			tooltip = "Portal to HellFire Peninsula, Outland",
+			destination = {
+				y = 0.49560798548094,
+				mapID = 100,
+				x = 0.89162719838972,
 			},
-			["destination"] = {
-				["mapID"] = 1462,
-				["x"] = 0.75731763870321,
-				["y"] = 0.21320900152281,
+			origin = {
+				y = 0.17035557881295,
+				x = 0.85221381072501,
+				mapID = 90,
 			},
 		}, -- [18]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.25476156859977,
-				["x"] = 0.55301410416057,
-				["mapID"] = 125,
+			tooltip = "Portal to Zuldazar",
+			destination = {
+				y = 0.68583374023438,
+				mapID = 1163,
+				x = 0.70333319769965,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.62772743942331,
+				x = 0.4727348470357,
+				mapID = 1355,
 			},
 		}, -- [19]
 		{
-			["tooltip"] = "Portal to Dalaran, Crystalsong Forest",
-			["origin"] = {
-				["y"] = 0.91711090955257,
-				["x"] = 0.56224005120374,
-				["mapID"] = 85,
+			tooltip = "Banshee's Wail to Drustvar",
+			destination = {
+				y = 0.43693684881455,
+				mapID = 896,
+				x = 0.20607681440632,
 			},
-			["destination"] = {
-				["mapID"] = 125,
-				["x"] = 0.55915854190679,
-				["y"] = 0.467831174332,
+			origin = {
+				y = 0.62980799772618,
+				x = 0.58454345381237,
+				mapID = 862,
 			},
 		}, -- [20]
 		{
-			["tooltip"] = "Portal to Jade Forest",
-			["origin"] = {
-				["y"] = 0.9226301536912,
-				["x"] = 0.57460081297161,
-				["mapID"] = 85,
+			tooltip = "Banshee's Wail to Stormsong Valley",
+			destination = {
+				y = 0.31070487254826,
+				mapID = 942,
+				x = 0.51058783027949,
 			},
-			["destination"] = {
-				["mapID"] = 371,
-				["x"] = 0.2855772268634,
-				["y"] = 0.13982759669818,
+			origin = {
+				y = 0.62980799772618,
+				x = 0.58454345381237,
+				mapID = 862,
 			},
 		}, -- [21]
 		{
-			["tooltip"] = "Portal to Zuldazar",
-			["origin"] = {
-				["y"] = 0.91348896151172,
-				["x"] = 0.5858117364355,
-				["mapID"] = 85,
+			tooltip = "Banshee's Wail to Tiragarde Sound",
+			destination = {
+				y = 0.51159193712012,
+				mapID = 895,
+				x = 0.88203434638142,
 			},
-			["destination"] = {
-				["mapID"] = 1163,
-				["x"] = 0.70333319769965,
-				["y"] = 0.68583374023438,
+			origin = {
+				y = 0.62980799772618,
+				x = 0.58454345381237,
+				mapID = 862,
 			},
 		}, -- [22]
 		{
-			["tooltip"] = "Portal to Azsuna",
-			["origin"] = {
-				["y"] = 0.89537901076584,
-				["x"] = 0.58885869565217,
-				["mapID"] = 85,
+			tooltip = "Portal to Nazjatar",
+			destination = {
+				y = 0.6262505365728,
+				mapID = 1355,
+				x = 0.47193758468472,
 			},
-			["destination"] = {
-				["mapID"] = 630,
-				["x"] = 0.46817071748393,
-				["y"] = 0.41362162170844,
+			origin = {
+				y = 0.85333353678385,
+				x = 0.62999979654948,
+				mapID = 1163,
 			},
 		}, -- [23]
 		{
-			["tooltip"] = "Portal to Warspear, Ashran (Lower Pathfinder's Den)",
-			["origin"] = {
-				["y"] = 0.9204,
-				["x"] = 0.5517,
-				["mapID"] = 85,
+			tooltip = "Portal to Silithus",
+			destination = {
+				y = 0.44943381928406,
+				mapID = 81,
+				x = 0.41537530710609,
 			},
-			["destination"] = {
-				["mapID"] = 624,
-				["x"] = 0.56951995849609,
-				["y"] = 0.4973742659755,
+			origin = {
+				y = 0.85416666666667,
+				x = 0.73611111111111,
+				mapID = 1163,
 			},
 		}, -- [24]
 		{
-			["tooltip"] = "Portal to Shattrath (Lower Pathfinder's Den)",
-			["origin"] = {
-				["y"] = 0.9164,
-				["x"] = 0.5751,
-				["mapID"] = 85,
+			tooltip = "Portal to Thunder Bluff",
+			destination = {
+				y = 0.1687186758094,
+				mapID = 88,
+				x = 0.22214766105373,
 			},
-			["destination"] = {
-				["mapID"] = 111,
-				["x"] = 0.53003551136364,
-				["y"] = 0.49210974806648,
+			origin = {
+				y = 0.775,
+				x = 0.73666653103299,
+				mapID = 1163,
 			},
 		}, -- [25]
 		{
-			["tooltip"] = "Portal to Silvermoon City",
-			["origin"] = {
-				["y"] = 0.88218457597122,
-				["x"] = 0.55982527847646,
-				["mapID"] = 85,
+			tooltip = "Portal to Silvermoon City",
+			destination = {
+				y = 0.19238329952114,
+				mapID = 110,
+				x = 0.58264465141624,
 			},
-			["destination"] = {
-				["mapID"] = 110,
-				["x"] = 0.58264465141624,
-				["y"] = 0.19238329952114,
+			origin = {
+				y = 0.62250061035156,
+				x = 0.73944430881076,
+				mapID = 1163,
 			},
 		}, -- [26]
 		{
-			["tooltip"] = "Portal to Cavern of Times (Lower Pathfinder's Den)",
-			["origin"] = {
-				["y"] = 0.9258,
-				["x"] = 0.5641,
-				["mapID"] = 85,
+			tooltip = "Greasy Eel to Mechagon",
+			destination = {
+				y = 0.21320900152281,
+				mapID = 1462,
+				x = 0.75731763870321,
 			},
-			["destination"] = {
-				["mapID"] = 74,
-				["x"] = 0.5460492553501,
-				["y"] = 0.28302714070312,
+			origin = {
+				y = 0.87604148782861,
+				x = 0.41825685012782,
+				mapID = 1165,
 			},
 		}, -- [27]
 		{
-			["tooltip"] = "Portal to Undercity",
-			["origin"] = {
-				["y"] = 0.55594681212568,
-				["x"] = 0.50745008758534,
-				["mapID"] = 85,
+			tooltip = "Portal to Dalaran, Crystalsong Forest",
+			destination = {
+				y = 0.467831174332,
+				mapID = 125,
+				x = 0.55915854190679,
 			},
-			["destination"] = {
-				["mapID"] = 90,
-				["x"] = 0.84585550612658,
-				["y"] = 0.16332547124834,
+			origin = {
+				y = 0.91711090955257,
+				x = 0.56224005120374,
+				mapID = 85,
 			},
 		}, -- [28]
 		{
-			["tooltip"] = "Portal to Uldum",
-			["origin"] = {
-				["y"] = 0.38545449836978,
-				["x"] = 0.48876521514553,
-				["mapID"] = 85,
+			tooltip = "Portal to Jade Forest",
+			destination = {
+				y = 0.13982759669818,
+				mapID = 371,
+				x = 0.2855772268634,
 			},
-			["destination"] = {
-				["mapID"] = 1527,
-				["x"] = 0.54895175722124,
-				["y"] = 0.34247656465072,
+			origin = {
+				y = 0.9226301536912,
+				x = 0.57460081297161,
+				mapID = 85,
 			},
 		}, -- [29]
 		{
-			["tooltip"] = "Portal to Uldum",
-			["origin"] = {
-				["y"] = 0.38545449836978,
-				["x"] = 0.48876521514553,
-				["mapID"] = 85,
+			tooltip = "Portal to Zuldazar",
+			destination = {
+				y = 0.68583374023438,
+				mapID = 1163,
+				x = 0.70333319769965,
 			},
-			["destination"] = {
-				["mapID"] = 249,
-				["x"] = 0.54895175722124,
-				["y"] = 0.34247656465072,
+			origin = {
+				y = 0.91348896151172,
+				x = 0.5858117364355,
+				mapID = 85,
 			},
 		}, -- [30]
 		{
-			["tooltip"] = "Portal to Vashj'ir",
-			["origin"] = {
-				["y"] = 0.36544725152611,
-				["x"] = 0.49221473005749,
-				["mapID"] = 85,
+			tooltip = "Portal to Azsuna",
+			destination = {
+				y = 0.41362162170844,
+				mapID = 630,
+				x = 0.46817071748393,
 			},
-			["destination"] = {
-				["mapID"] = 204,
-				["x"] = 0.51370135161043,
-				["y"] = 0.60947867366724,
+			origin = {
+				y = 0.89537901076584,
+				x = 0.58885869565217,
+				mapID = 85,
 			},
 		}, -- [31]
 		{
-			["tooltip"] = "Portal to Deepholm",
-			["origin"] = {
-				["y"] = 0.36311887139568,
-				["x"] = 0.50808255479698,
-				["mapID"] = 85,
+			tooltip = "Portal to Warspear, Ashran (Lower Pathfinder's Den)",
+			destination = {
+				y = 0.4973742659755,
+				mapID = 624,
+				x = 0.56951995849609,
 			},
-			["destination"] = {
-				["mapID"] = 207,
-				["x"] = 0.5059176514649,
-				["y"] = 0.52942107099127,
+			origin = {
+				y = 0.9204,
+				x = 0.5517,
+				mapID = 85,
 			},
 		}, -- [32]
 		{
-			["tooltip"] = "Portal to Hyjal",
-			["origin"] = {
-				["y"] = 0.38278114574241,
-				["x"] = 0.5111870620733,
-				["mapID"] = 85,
+			tooltip = "Portal to Shattrath (Lower Pathfinder's Den)",
+			destination = {
+				y = 0.49210974806648,
+				mapID = 111,
+				x = 0.53003551136364,
 			},
-			["destination"] = {
-				["mapID"] = 198,
-				["x"] = 0.63486551497068,
-				["y"] = 0.2337236134106,
+			origin = {
+				y = 0.9164,
+				x = 0.5751,
+				mapID = 85,
 			},
 		}, -- [33]
 		{
-			["tooltip"] = "Portal to Twilight Highlands",
-			["origin"] = {
-				["y"] = 0.39450947374272,
-				["x"] = 0.50227581521739,
-				["mapID"] = 85,
+			tooltip = "Portal to Silvermoon City",
+			destination = {
+				y = 0.19238329952114,
+				mapID = 110,
+				x = 0.58264465141624,
 			},
-			["destination"] = {
-				["mapID"] = 241,
-				["x"] = 0.73631666027462,
-				["y"] = 0.53393293284393,
+			origin = {
+				y = 0.88218457597122,
+				x = 0.55982527847646,
+				mapID = 85,
 			},
 		}, -- [34]
 		{
-			["tooltip"] = "Portal to Tol Barad",
-			["origin"] = {
-				["y"] = 0.39287103860618,
-				["x"] = 0.47387486525332,
-				["mapID"] = 85,
+			tooltip = "Portal to Cavern of Times (Lower Pathfinder's Den)",
+			destination = {
+				y = 0.28302714070312,
+				mapID = 74,
+				x = 0.5460492553501,
 			},
-			["destination"] = {
-				["mapID"] = 245,
-				["x"] = 0.44771604383759,
-				["y"] = 0.62372974957755,
+			origin = {
+				y = 0.9258,
+				x = 0.5641,
+				mapID = 85,
 			},
 		}, -- [35]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.24446088576159,
-				["x"] = 0.63479490345888,
-				["mapID"] = 198,
+			tooltip = "Portal to Undercity",
+			destination = {
+				y = 0.16332547124834,
+				mapID = 90,
+				x = 0.84585550612658,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.55594681212568,
+				x = 0.50745008758534,
+				mapID = 85,
 			},
 		}, -- [36]
 		{
-			["tooltip"] = "Portal to Zuldazar",
-			["origin"] = {
-				["y"] = 0.4520574119515,
-				["x"] = 0.41601595868837,
-				["mapID"] = 81,
+			tooltip = "Portal to Uldum",
+			destination = {
+				y = 0.34247656465072,
+				mapID = 1527,
+				x = 0.54895175722124,
 			},
-			["destination"] = {
-				["mapID"] = 1163,
-				["x"] = 0.68277757432726,
-				["y"] = 0.64583333333333,
+			origin = {
+				y = 0.38545449836978,
+				x = 0.48876521514553,
+				mapID = 85,
 			},
 		}, -- [37]
-
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.267044943523,
-				["x"] = 0.58198599758397,
-				["mapID"] = 74,
+			tooltip = "Portal to Uldum",
+			destination = {
+				y = 0.34247656465072,
+				mapID = 249,
+				x = 0.54895175722124,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.38545449836978,
+				x = 0.48876521514553,
+				mapID = 85,
+			},
+		}, -- [38]
+		{
+			tooltip = "Portal to Vashj'ir",
+			destination = {
+				y = 0.60947867366724,
+				mapID = 204,
+				x = 0.51370135161043,
+			},
+			origin = {
+				y = 0.36544725152611,
+				x = 0.49221473005749,
+				mapID = 85,
+			},
+		}, -- [39]
+		{
+			tooltip = "Portal to Deepholm",
+			destination = {
+				y = 0.52942107099127,
+				mapID = 207,
+				x = 0.5059176514649,
+			},
+			origin = {
+				y = 0.36311887139568,
+				x = 0.50808255479698,
+				mapID = 85,
 			},
 		}, -- [40]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.2395178315967,
-				["x"] = 0.55211635002278,
-				["mapID"] = 627,
+			tooltip = "Portal to Hyjal",
+			destination = {
+				y = 0.2337236134106,
+				mapID = 198,
+				x = 0.63486551497068,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.38278114574241,
+				x = 0.5111870620733,
+				mapID = 85,
 			},
 		}, -- [41]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.41296159312871,
-				["x"] = 0.46663798048915,
-				["mapID"] = 630,
+			tooltip = "Portal to Twilight Highlands",
+			destination = {
+				y = 0.53393293284393,
+				mapID = 241,
+				x = 0.73631666027462,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.39450947374272,
+				x = 0.50227581521739,
+				mapID = 85,
 			},
 		}, -- [42]
 		{
-			["tooltip"] = "Banshee's Wail to Zuldazar",
-			["origin"] = {
-				["y"] = 0.43340743614875,
-				["x"] = 0.20602456086601,
-				["mapID"] = 896,
+			tooltip = "Portal to Tol Barad",
+			destination = {
+				y = 0.62372974957755,
+				mapID = 245,
+				x = 0.44771604383759,
 			},
-			["destination"] = {
-				["mapID"] = 862,
-				["x"] = 0.58402363790205,
-				["y"] = 0.62495129448905,
+			origin = {
+				y = 0.39287103860618,
+				x = 0.47387486525332,
+				mapID = 85,
 			},
 		}, -- [43]
 		{
-			["tooltip"] = "Banshee's Wail to Zuldazar",
-			["origin"] = {
-				["y"] = 0.51185500686031,
-				["x"] = 0.87841985717018,
-				["mapID"] = 895,
+			tooltip = "Portal to Zuldazar",
+			destination = {
+				y = 0.64583333333333,
+				mapID = 1163,
+				x = 0.68277757432726,
 			},
-			["destination"] = {
-				["mapID"] = 862,
-				["x"] = 0.58402363790205,
-				["y"] = 0.62495129448905,
+			origin = {
+				y = 0.4520574119515,
+				x = 0.41601595868837,
+				mapID = 81,
 			},
 		}, -- [44]
 		{
-			["tooltip"] = "Banshee's Wail to Zuldazar",
-			["origin"] = {
-				["y"] = 0.24462557170856,
-				["x"] = 0.51955369973581,
-				["mapID"] = 942,
+			tooltip = "Banshee's Wail to Zuldazar",
+			destination = {
+				y = 0.62495129448905,
+				mapID = 862,
+				x = 0.58402363790205,
 			},
-			["destination"] = {
-				["mapID"] = 862,
-				["x"] = 0.58402363790205,
-				["y"] = 0.62495129448905,
+			origin = {
+				y = 0.43340743614875,
+				x = 0.20602456086601,
+				mapID = 896,
 			},
 		}, -- [45]
 		{
-			["tooltip"] = "Greasy Eel to Zuldazar",
-			["origin"] = {
-				["y"] = 0.22668496550168,
-				["x"] = 0.75500752005348,
-				["mapID"] = 1462,
+			tooltip = "Banshee's Wail to Zuldazar",
+			destination = {
+				y = 0.62495129448905,
+				mapID = 862,
+				x = 0.58402363790205,
 			},
-			["destination"] = {
-				["mapID"] = 1165,
-				["x"] = 0.41751074550264,
-				["y"] = 0.87433673840999,
+			origin = {
+				y = 0.51185500686031,
+				x = 0.87841985717018,
+				mapID = 895,
 			},
 		}, -- [46]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.14021435795428,
-				["x"] = 0.28511899099554,
-				["mapID"] = 371,
+			tooltip = "Banshee's Wail to Zuldazar",
+			destination = {
+				y = 0.62495129448905,
+				mapID = 862,
+				x = 0.58402363790205,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.24462557170856,
+				x = 0.51955369973581,
+				mapID = 942,
 			},
 		}, -- [47]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.098700038554703,
-				["x"] = 0.63762695780944,
-				["mapID"] = 1530,
+			tooltip = "Greasy Eel to Zuldazar",
+			destination = {
+				y = 0.87433673840999,
+				mapID = 1165,
+				x = 0.41751074550264,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.22668496550168,
+				x = 0.75500752005348,
+				mapID = 1462,
 			},
 		}, -- [48]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.5475,
-				["x"] = 0.2089,
-				["mapID"] = 1670,
+			tooltip = "Portal to Oribos",
+			destination = {
+				y = 0.50311940044438,
+				x = 0.20336391437309,
+				mapID = 1670,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.57103620194035,
-				["y"] = 0.89813858019974,
+			origin = {
+				y = 0.87839019431731,
+				x = 0.58328186758893,
+				mapID = 85,
 			},
-		}, -- [49]	
+		}, -- [49]
 		{
-			["tooltip"] = "Portal to Oribos",
-			["origin"] = {
-				["y"] = 0.8783,
-				["x"] = 0.5835,
-				["mapID"] = 85,
+			tooltip = "Zeppelin to Borean Tundra",
+			destination = {
+				y = 0.5354,
+				mapID = 114,
+				x = 0.4129,
 			},
-			["destination"] = {
-				["mapID"] = 1670,
-				["x"] = 0.2034,
-				["y"] = 0.5031,
+			origin = {
+				y = 0.6168,
+				x = 0.4525,
+				mapID = 85,
 			},
-		}, -- [50]	
+		}, -- [50]
 		{
-			["tooltip"] = "Portal to Orgrimmar",
-			["origin"] = {
-				["y"] = 0.57890164852142,
-				["x"] = 0.33675336837769,
-				["mapID"] = 619,
+			tooltip = "Zeppelin to Orgrimmar",
+			destination = {
+				y = 0.6168,
+				x = 0.4525,
+				mapID = 85,
 			},
-			["destination"] = {
-				["mapID"] = 85,
-				["x"] = 0.50135588842975,
-				["y"] = 0.37890044201114,
-			},
-		}, -- [51]
-		
-		
-		
-		
-		
-		-- [[
-		--zeppelins!
-		{
-			["tooltip"] = "Zeppelin to Borean Tundra",
-			["origin"] = {
-				["y"] = 0.6168,
-				["x"] = 0.4525,
-				["mapID"] = 85,
-			},
-			["destination"] = {
-				["mapID"] = 114,
-				["x"] = 0.4129,
-				["y"] = 0.5354,
+			origin = {
+				y = 0.5354,
+				mapID = 114,
+				x = 0.4129,
 			},
 		}, -- [51]
 		{
-			["tooltip"] = "Zeppelin to Orgrimmar",
-			["origin"] = {
-				["mapID"] = 114,
-				["x"] = 0.4129,
-				["y"] = 0.5354,
+			tooltip = "Waystone to Oribos",
+			destination = {
+				y = 0.5031,
+				x = 0.1924,
+				mapID = 1670,
 			},
-			["destination"] = {
-				["y"] = 0.6168,
-				["x"] = 0.4525,
-				["mapID"] = 85,
+			origin = {
+				y = 0.4217,
+				x = 0.4237,
+				mapID = 1543,
 			},
 		}, -- [52]
-
 		{
-			["tooltip"] = "Waystone to Oribos",
-			["origin"] = {
-				x = 0.4237,
-				y = 0.4217,
-				mapID = 1543
+			tooltip = "Pad to Ring of Fates",
+			destination = {
+				y = 0.50293573502007,
+				x = 0.47113152833524,
+				mapID = 1670,
 			},
-			["destination"] = {
-				x = 0.1924,
-				y = 0.5031,
+			origin = {
+				y = 0.51546868982912,
+				x = 0.43374996185303,
+				mapID = 1671,
+			},
+		}, -- [53]
+		{
+			tooltip = "Pad to Ring of Transference",
+			destination = {
+				y = 0.51546868982912,
+				x = 0.43374996185303,
+				mapID = 1671,
+			},
+			origin = {
+				y = 0.50293573502007,
+				x = 0.47113152833524,
 				mapID = 1670,
 			},
 		}, -- [54]
-
 		{
-            tooltip = "Pad to Ring of Fates",
-            origin = {
-                x = 0.43374996185303,
-                y = 0.51546868982912,
-                mapID = 1671,
-            },
-            destination = {
-                x = 0.47113152833524,
-                y = 0.50293573502007,
-                mapID = 1670,
-            } 
-        },
-		{
-            tooltip = "Pad to Ring of Transference",
-            origin = {
-                x = 0.47113152833524,
-                y = 0.50293573502007,
-                mapID = 1670,
-            },
-            destination = {
-                x = 0.43374996185303,
-                y = 0.51546868982912,
-                mapID = 1671,
-            } 
-        },
-		
-		{
-            tooltip = "Pad to Ring of Transference",
-            origin = {
-                x = 0.52091740132836,
-                y = 0.42440375931766,
-                mapID = 1670,
-            },
-            destination = {
-                x = 0.49375,
-                y = 0.42007819746433,
-                mapID = 1671,
-            } 
-        },
-		{
-            tooltip = "Pad to Ring of Fates",
-            origin = {
-                x = 0.49375,
-                y = 0.42007819746433,
-                mapID = 1671,
-            },
-            destination = {
-                x = 0.52091740132836,
-                y = 0.42440375931766,
-                mapID = 1670,
-            } 
-        },
-		
-		{
-            tooltip = "Pad to Ring of Fates",
-            origin = {
-                x = 0.55656242370605,
-                y = 0.51617192913591,
-                mapID = 1671,
-            },
-            destination = {
-                x = 0.5714373387328,
-                y = 0.50366972477064,
-                mapID = 1670,
-            } 
-        },
-		{
-            tooltip = "Pad to Ring of Transference",
-            origin = {
-                x = 0.5714373387328,
-                y = 0.50366972477064,
-                mapID = 1670,
-            },
-            destination = {
-                x = 0.55656242370605,
-                y = 0.51617192913591,
-                mapID = 1671,
-            } 
-        },
-		
-		{
-            tooltip = "Pad to Ring of Transference",
-            origin = {
-                x = 0.52067281273891,
-                y = 0.57853219968463,
-                mapID = 1670,
-            },
-            destination = {
-                x = 0.49515628814697,
-                y = 0.60921867194773,
-                mapID = 1671,
-            } 
-        },
-		{
-            tooltip = "Pad to Ring of Fates",
-            origin = {
-                x = 0.49515628814697,
-                y = 0.60921867194773,
-                mapID = 1671,
-            },
-            destination = {
-                x = 0.52067281273891,
-                y = 0.57853219968463,
-                mapID = 1670,
-            } 
-        },
-
-
-		{
-			["tooltip"] = "Ring of Transference",
-			["origin"] = {
-				["mapID"] = 1671,
-				["x"] = 0.5,
-				["y"] = 0.5,
+			tooltip = "Pad to Ring of Transference",
+			destination = {
+				y = 0.42007819746433,
+				x = 0.49375,
+				mapID = 1671,
 			},
-			["destination"] = {
-				x = 0.4495,
+			origin = {
+				y = 0.42440375931766,
+				x = 0.52091740132836,
+				mapID = 1670,
+			},
+		}, -- [55]
+		{
+			tooltip = "Pad to Ring of Fates",
+			destination = {
+				y = 0.42440375931766,
+				x = 0.52091740132836,
+				mapID = 1670,
+			},
+			origin = {
+				y = 0.42007819746433,
+				x = 0.49375,
+				mapID = 1671,
+			},
+		}, -- [56]
+		{
+			tooltip = "Pad to Ring of Fates",
+			destination = {
+				y = 0.50366972477064,
+				x = 0.5714373387328,
+				mapID = 1670,
+			},
+			origin = {
+				y = 0.51617192913591,
+				x = 0.55656242370605,
+				mapID = 1671,
+			},
+		}, -- [57]
+		{
+			tooltip = "Pad to Ring of Transference",
+			destination = {
+				y = 0.51617192913591,
+				x = 0.55656242370605,
+				mapID = 1671,
+			},
+			origin = {
+				y = 0.50366972477064,
+				x = 0.5714373387328,
+				mapID = 1670,
+			},
+		}, -- [58]
+		{
+			tooltip = "Pad to Ring of Transference",
+			destination = {
+				y = 0.60921867194773,
+				x = 0.49515628814697,
+				mapID = 1671,
+			},
+			origin = {
+				y = 0.57853219968463,
+				x = 0.52067281273891,
+				mapID = 1670,
+			},
+		}, -- [59]
+		{
+			tooltip = "Pad to Ring of Fates",
+			destination = {
+				y = 0.57853219968463,
+				x = 0.52067281273891,
+				mapID = 1670,
+			},
+			origin = {
+				y = 0.60921867194773,
+				x = 0.49515628814697,
+				mapID = 1671,
+			},
+		}, -- [60]
+		{
+			tooltip = "Ring of Transference",
+			destination = {
 				y = 0.4098,
-				mapID = 1543
+				x = 0.4495,
+				mapID = 1543,
 			},
-		}, -- [53]
+			origin = {
+				y = 0.5,
+				mapID = 1671,
+				x = 0.5,
+			},
+		}, -- [61]
 	}
-
-
-	--portal taken monitor!
-	local portalTakenMonitor = {}
-	for i, b in pairs(networkLocations) do
-		local x, y = b.destination.x, b.destination.y
-		portalTakenMonitor[floor(x * 100)..":"..floor(y * 100)] = true
+	
+	do --Add internal reference for each portal's index
+		for i, b in pairs(networkLocations) do
+			b.index = i
+		end
 	end
-
-	--[[
-		Enum.UIMapType = {
-			Cosmic    = 0,
-			World     = 1,
-			Continent = 2,
-			Zone      = 3,
-			Dungeon   = 4,
-			Micro     = 5,
-			Orphan    = 6,
+	
+	--Sort portal list into 2 lists. Saves time later, as this info is needed every time.
+	local portalsBy; do
+		portalsBy = {
+			originMapID = {},
+			destinationMapID = {},
 		}
-	--]]
 
-	local PortalsByOrigonMapID = {}
-	--faster to look up portals by origin id, so presort now instead of doing so constantly
-	for i, portalDetails in pairs(networkLocations) do
-		for i, b in pairs( GetZoneIDs(portalDetails.origin.mapID)) do
-			PortalsByOrigonMapID[b] = PortalsByOrigonMapID[b] or {}
-			tinsert(PortalsByOrigonMapID[b], portalDetails)
+		--Portals starting on each map, based on originMapID
+		for portalID, portalData in pairs(networkLocations) do
+			for i, mapID in pairs(GetZoneIDs(portalData.origin.mapID)) do
+				portalsBy.originMapID[mapID] = portalsBy.originMapID[mapID] or {}
+				if mapID~= 946 and not tContains(portalsBy.originMapID[mapID], portalID) then
+					tinsert(portalsBy.originMapID[mapID], portalID)
+				end
+			end
+		end
+
+		--Portals leading to each map, based on destinationMapID
+		for portalID, portalData in pairs(networkLocations) do
+			for i, mapID in pairs(GetZoneIDs(portalData.destination.mapID)) do
+				portalsBy.destinationMapID[mapID] = portalsBy.destinationMapID[mapID] or {}
+				if mapID ~= 946 and not tContains(portalsBy.destinationMapID[mapID], portalID) then
+					tinsert(portalsBy.destinationMapID[mapID], portalID)
+				end
+			end
 		end
 	end
 
-	local function GetPortalDetailsByID(portalID)
+	local function GetPortalByID(portalID)
 		return networkLocations[portalID]
 	end
+
+	local function GetPortals(mapID, UseDestList)
+		local list = UseDestList and portalsBy.destinationMapID or portalsBy.originMapID
+		local mapIDS = GetZoneIDs(mapID)
+		local portals = list[mapID]
+		return mapIDS, (portals and #portals > 0) and portals or list[mapIDS[#mapIDS]]
+	end
 	
-	local function GetIDByPortalDetails(portalDetails)
-		return tIndexOf(networkLocations, portalDetails)
+	local function GetGateway(destinationPortalList, originMapID, potentialPortals, m, numJumpsRequired, originPortalID, optionsFound)
+		--there were no direct portals available, digging deeper.
+		if trace then
+			--store this mapID, so we only try looking it up once.
+			trace[originMapID] = true
+		end
+		local originMapIDs,  originPortalList = GetPortals(originMapID)
+		if originPortalList then
+			for i, possibleOriginPortalID in pairs(originPortalList) do
+				if tContains(destinationPortalList, possibleOriginPortalID) then
+					if not tContains(potentialPortals, originPortalID or possibleOriginPortalID) then
+						tinsert(potentialPortals, {originPortalID or possibleOriginPortalID, numJumpsRequired})
+						optionsFound = true --options have been found
+					end
+				elseif not optionsFound then
+					--if no options have been found, keep digging
+					local portal = GetPortalByID(possibleOriginPortalID)
+					
+					if (not trace or (not trace[portal.destination.mapID]))
+					and (not numJumpsRequired or (numJumpsRequired < 3)) then
+						GetGateway(destinationPortalList, portal.destination.mapID, potentialPortals, trace, (numJumpsRequired or 1) + 1 or {}, originPortalID or possibleOriginPortalID, optionsFound)
+					end
+				end		
+			end
+		end
 	end
 
-	
-
-	local noPortalOptions = {
+	local nopotentialPortals = {
+		--dungeons don't allow coords or waypoints
 		[Enum.UIMapType.Dungeon] = true,
 	}
 	
 	local storedTransit = {}
 
-	local maxRecalls = 4
-	local maxPortalRecommendations = 10
+	local potentialPortals = {}--reusable; Collect multiple portal options
+	function Questra:GetPortal(destinationMapID)
+		--[[Simplified Explanation:
+				1. Get a list of portals leading to destination and a list of portals of available at origin
+				2. check if any portals available at origin are on the destinationPortalList, and store them.
+					2A. 
+		--]]
 	
-	local function GetPortalOptions(originMapID, destinationMapID, portalOptions, overridePortal, portalCount)
-		if ((portalCount or 0) > maxRecalls) or (portalOptions and (#portalOptions > maxPortalRecommendations)) then
-			return
+		--Get player's current location
+		local x, y, originMapID = Questra.GetPlayerPosition()
+	
+		--check if this origin/destination combination has been looked up before, and return the stored result.
+		if nopotentialPortals[destinationMapID..originMapID] then
+			--Origin to destination have been checked before and no options were available.
+			return 
+		elseif storedTransit[destinationMapID..originMapID] then
+			--Origin to destination have been checked before and options were available.
+			return storedTransit[destinationMapID..originMapID]
 		end
 		
-		portalOptions = portalOptions or {}
-		duplicateCheck = duplicateCheck or {x}
-	
-		--Get list of all ids for origin and destination
-		local originMapParentIDs = GetZoneIDs(originMapID)
-		local destinationMapParentIDs = GetZoneIDs(destinationMapID)
+		--Clean the table for reuse
+		wipe(potentialPortals)
 		
-		--check if origin and destination  are on same world and/or continent
-		for i, oid in pairs(originMapParentIDs) do
-			if tContains(destinationMapParentIDs, oid) then
+		--Get parent mapIDs and possible portals
+		local destinationMapIDS, destinationPortalList = GetPortals(destinationMapID, true)--portals that lead to destination
+		local originMapIDs, originPortalList = GetPortals(originMapID) --portals the start at origin
+
+		do --Makes sure origin and destination are not the same and are not on same world and/or continent
+			if (destinationPortalList and #destinationPortalList < 1) 
+			or tContains(originMapIDs, destinationMapID)
+			or tContains(destinationMapIDS, originMapID)
+			or originMapID == destinationMapID then
+				nopotentialPortals[destinationMapID..originMapID] = true
 				return
 			end
+
+			for _,portalID in pairs(originMapIDs) do
+				if  tContains(destinationMapIDS, portalID) then
+					nopotentialPortals[destinationMapID..originMapID] = true
+					return
+				end
+			end
 		end
-	
-		do--Get a list of portals available from current zone/continent/world for all originMapParentIDs
-			local index = 1
-			local oMapID = originMapParentIDs[index]
-			local lastID
-			while oMapID do
-				tinsert(duplicateCheck, oMapID)
-				if lastID == oMapID then break end
-				local originPortals = PortalsByOrigonMapID[oMapID] --get a list of any portals available from this zone/continent/world to any other zone/continent/world
-				
-				if originPortals then
-					for _, originPortal in pairs(originPortals) do
-						portalCount = portalCount or 1
-						local noPortal = true
-						local portalDestinationMapParentIDs = GetZoneIDs(originPortal.destination and originPortal.destination.mapID)
-						do --Check if portal leads directly to destination
-							for i, did in pairs(destinationMapParentIDs) do
-								if tContains(portalDestinationMapParentIDs, did) then
-									local portalIndex = tIndexOf(networkLocations, overridePortal or originPortal)
-									if (#portalOptions < maxPortalRecommendations) and ((portalCount or 0) <= maxRecalls) then
-										tinsert(portalOptions, {portalIndex,  portalCount})
-										
-										--todo: calculate dist to player, and dist to dest, combine and replace portalCount
-										
-										noPortal = nil
-									end
-								end
-							end
-						end
-						--No Portal found, check if any portals from this portal's destination will lead to destinationMapID
-						if noPortal and originPortal.destination and originPortal.destination.mapID then
-							if ( not tContains(duplicateCheck, originPortal.destination.mapID)) then
-								tinsert(duplicateCheck, originPortal.destination.mapID)
-								GetPortalOptions(originPortal.destination and originPortal.destination.mapID, destinationMapID, portalOptions, overridePortal or originPortal, portalCount + 1)
-							end
-						end
+		
+		local optionsFound; do
+			--Try to find a one hop portal that leads directly from origin to destination
+			for i, originPortalID in pairs(originPortalList) do
+				if tContains(destinationPortalList, originPortalID) then
+					if not tContains(potentialPortals, originPortalID) then
+						tinsert(potentialPortals, {originPortalID, 1})
+						optionsFound = true
 					end
-				end
-				
-				lastID = oMapID
-				if (not portalOptions)  or (#portalOptions < 1) then
-					index = index + 1
-					oMapID = originMapParentIDs[index]
-				else
-					oMapID = nil
-				end
+				end		
+			end
+
+			if not optionsFound then
+				--If no portal has been found above, dig a little deeper
+				GetGateway(destinationPortalList, originMapID, potentialPortals, {})
 			end
 		end
-		return portalOptions
-	end
-	
-	function Questra:GetPortal(destinationID)
-		local x, y, originID = Questra.GetPlayerPosition()
 		
-		if portalTakenMonitor[floor(x * 100)..":"..floor(y * 100)] then
-			storedTransit = {}
+		table.sort(potentialPortals, function(a, b)
+			--sort potentialPortals by fewest number of jumps required
+			return a[2] > b[2]
+		end)
+		
+		if #potentialPortals < 1 then
+			nopotentialPortals[destinationMapID..originMapID] = true
+		else
+			storedTransit[destinationMapID..originMapID] = GetPortalByID(potentialPortals[#potentialPortals][1])
 		end
 		
-		if not storedTransit[originID..destinationID] then
-			local portalOptions = GetPortalOptions(originID, destinationID)
-			if portalOptions and #portalOptions > 0 then
-				table.sort(portalOptions, function(a, b)
-					return (a[2] < b[2])
-				end)
-				storedTransit[originID..destinationID] = networkLocations[portalOptions[1][1]]
-				return networkLocations[portalOptions[1][1]]
-			end
-		end
-		return storedTransit[originID..destinationID]
+		return potentialPortals and GetPortalByID(potentialPortals[#potentialPortals][1])
 	end
 end
 
@@ -4986,6 +5178,7 @@ do --flight recommendations
 	--Track combined distance from player to nearest flight  point, and the destination's nearest flight point
 	--compare difference of player's distance to destination to flight distance
 	--if flight is shorter distance, recommend it.
+
 	local storedIDs = {}
 	local function GetZoneIDs(baseID) --get parent zone IDS for baseID
 		if baseID and not storedIDs[baseID] then
@@ -5010,7 +5203,7 @@ do --flight recommendations
 		end
 		return baseID and storedIDs[baseID] or {}--return then stored id
 	end
-
+	
 	local function ShouldShowTaxiNode(factionGroup, taxiNodeInfo)
 		if taxiNodeInfo.faction == Enum.FlightPathFaction.Horde then
 			return factionGroup == "Horde";
@@ -5026,28 +5219,47 @@ do --flight recommendations
 		
 		return true
 	end
-
+	local pingAnywherePin
+	
+	
+	function doTHIS()
+		FlightMapFrame.oldOnEvent = FlightMapFrame:GetScript("OnEvent")
+		FlightMapFrame:SetScript("OnEvent", function(self, event, ...)
+			prin(self, event, ...)
+			return FlightMapFrame:oldOnEvent(self, event, ...)
+		end)
+	
+	end
+	
+	
+	local lastPing
 	local function PingFlightMapAnywhere(x, y, wayMapID)
 		--handy tool derived from: "Interface\AddOns\Blizzard_SharedMapDataProviders\WorldQuestDataProvider.lua"
-		pingAnywherePin = pingAnywherePin or FlightMapFrame:AcquirePin("WorldQuestPingPinTemplate")
-
-		pingAnywherePin:Stop()
-		pingAnywherePin.dataProvider = FlightMapFrame
-
-		if x and y then
-			--safety precaution
-			local _x, _y = HBD:TranslateZoneCoordinates(x, y, wayMapID, FlightMapFrame.mapID, true)
+		pingAnywherePin = pingAnywherePin or FlightMapFrame:AcquirePin("QuestraPingPinTemplate")
 		
-			pingAnywherePin.textureSet = ((not pingAnywherePin.textureSet) and pingAnywherePin.Expand:SetAtlas("ArtifactsFX-Whirls")) and true --just to be different
-			pingAnywherePin:Show();
-			pingAnywherePin:SetPosition(_x, _y);
+		pingAnywherePin.DriverAnimation:Stop()
+		pingAnywherePin:Hide()
 
-			pingAnywherePin.DriverAnimation:Play();
-			pingAnywherePin.ScaleAnimation:Play();
+		if wayMapID and x and y then
+			do --override display, if ping point isn't displayed at current zoom level and position
+				local x, y = HBD:TranslateZoneCoordinates(.5, .5, wayMapID, FlightMapFrame.mapID, true)					
+				FlightMapFrame:InstantPanAndZoom(FlightMapFrame:GetScaleForMaxZoom(), x, y, true);
+			end
+			local x, y = HBD:TranslateZoneCoordinates(x, y, wayMapID, FlightMapFrame.mapID, true)
+
+			if (not pingAnywherePin.DriverAnimation:IsPlaying()) or lastPing ~= x..y..wayMapID then
+				pingAnywherePin:Show()
+				FlightMapFrame:SetPinPosition(pingAnywherePin, x, y)
+				pingAnywherePin.DriverAnimation:Play()
+				lastPing = x..y..wayMapID
+			end
 		else
-			pingAnywherePin:Stop();
+			pingAnywherePin.DriverAnimation:Stop()
+			pingAnywherePin:Hide()
 		end
 	end
+	Questra.PingFlightMapAnywhere = PingFlightMapAnywhere
+	
 	local destStore = {}
 	local one
 	local noFlyList = {}
@@ -5068,7 +5280,7 @@ do --flight recommendations
 		end
 		unlearnedPoints[mapID] = unlearnedPoints[mapID] or {}
 		
-		local nodes = storedNodes[mapID] --or C_TaxiMap.GetTaxiNodesForMap(mapID)		
+		local nodes = storedNodes[mapID] or C_TaxiMap.GetTaxiNodesForMap(mapID)		
 		
 		if nodes and (#nodes > 0) then
 			for index, taxiNodeInfo in pairs(nodes) do
@@ -5098,20 +5310,26 @@ do --flight recommendations
 		if UnitOnTaxi("player") then return  end
 		local x, y, originID = Questra.GetPlayerPosition()
 		
-		-- if noFly[originID..destinationID] then
-			-- return 
-		-- end
+		if noFly[originID..destinationID] then
+			return 
+		end
 		
 		local oIDS = GetZoneIDs(originID)
 		local isAzeroth = tContains(oIDS, 947)
 		local dIDS 
 		if isAzeroth then
-			oIDS = Questra.GetZoneIDs(originID)
+			oIDS = Questra.GetZoneIDs(originID) --Azeroth does not allow flights between continents, use similar function from portal system
 			dIDS = Questra.GetZoneIDs(destinationID)
 		else
 			dIDS = GetZoneIDs(destinationID)
 		end
 		
+		--if tContains(oIDS, destinationID)
+		--or tContains(dIDS, originID)
+		if originID == destinationID then
+			return
+		end
+				
 		local sameWorld
 		for i, oid in pairs(oIDS) do
 			if tContains(dIDS, oid) then
@@ -5138,6 +5356,7 @@ do --flight recommendations
 					if (FlightMapFrame and FlightMapFrame:IsShown()) then
 						if not one then
 							one = true
+							prin("ping")
 							PingFlightMapAnywhere(nearestDestFlight.position.x, nearestDestFlight.position.y, nearestDestFlight.position.mapID)
 						end
 					else
@@ -5155,7 +5374,7 @@ do --flight recommendations
 					}
 				end
 			else			
-				--noFly[originID..destinationID] = true
+				noFly[originID..destinationID] = true
 			end
 		end
 	end

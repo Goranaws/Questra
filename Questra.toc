@@ -2,16 +2,13 @@
 ## Title: Questra
 ## Notes: Compass styled navigation!
 ## Author: Goranaws
-## Version: 3.9.1
-## Dependencies: sandCastle
+## Version: 1
 ## SavedVariables: Questra_DB, Questra_AltDB
-## OptionalDeps: Masque, FlyPaper
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 libs\HereBeDragons\HereBeDragons-2.0.lua
 libs\ChatThrottleLib\ChatThrottleLib.xml
-libs\LibFlyPaper-2.0\LibFlyPaper-2.0.lua
 
 template.xml
 frame.lua

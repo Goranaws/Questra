@@ -69,10 +69,6 @@
 					</Anchors>
 				</Texture>
 			</Layer>
-			
-			
-			
-			
 		</Layers>
 
 		<Scripts>
@@ -170,7 +166,39 @@
 		</Animations>
 	</Button>
 
-
+	<Frame name="QuestraPingPinTemplate" mixin="WorldQuestPingPinMixin" virtual="true">
+		<Size x="1" y="1"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Expand" atlas="powerswirlanimation-spinningglowys" alpha="0">
+					<Size x="50" y="50"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Animations>
+			<AnimationGroup parentKey="DriverAnimation">
+				<Rotation childKey="Expand" duration="2.25" order="1" degrees="-360" />
+				<Scale childKey="Expand" fromScaleX="2.5" fromScaleY="2.5" toScaleX=".75" toScaleY=".75" duration="2.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="1.0" toAlpha="0.2" startDelay="0.05" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="0.2" toAlpha="1.0" startDelay="0.25" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="1.0" toAlpha="0.2" startDelay="0.50" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="0.2" toAlpha="1.0" startDelay="0.75" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="1.0" toAlpha="0.2" startDelay="1.00" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="0.2" toAlpha="1.0" startDelay="1.25" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="1.0" toAlpha="0.2" startDelay="1.50" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="0.2" toAlpha="1.0" startDelay="1.75" duration="0.25" order="1"/>
+				<Alpha childKey="Expand" fromAlpha="1.0" toAlpha="0"   startDelay="2"    duration="0.25" order="1"/>
+				<Scripts>
+					<OnFinished>
+						self:GetParent():Hide()
+					</OnFinished>
+				</Scripts>
+			</AnimationGroup>
+		</Animations>
+	</Frame>
 
 
 </Ui>
