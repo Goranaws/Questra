@@ -1,7 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
 	
-	<Frame name="Quest_CompassNavBarTemplate"  virtual="true">
+	<Frame name="QuestraNavBarTemplate"  virtual="true">
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture file="Interface\HelpFrame\CS_HelpTextures_Tile" horizTile="true">
@@ -21,14 +21,14 @@
 		</Frames>
 	</Frame>
 	
-	<Button name="Quest_CompassItemButtonTemplate" inherits="SecureActionButtonTemplate" hidden="true" virtual="true">
-		<Size x="25" y="25"/>
+	<Button name="QuestraItemButtonTemplate" inherits="SecureActionButtonTemplate" hidden="true" virtual="true">
+		<Size x="35" y="35"/>
 <!-- 		<Anchors>
 			<Anchor point="CENTER" relativeKey="$parent.navButton" relativePoint="RIGHT" x="-8" y="-17"/>
 		</Anchors>
  -->		<Frames>
 			<Frame parentKey="textureHandler" useParentLevel="true">
-				<Size x="25" y="25"/>
+				<Size x="35" y="35"/>
 				<Anchors>
 					<Anchor point="CENTER"  x="0" y="0"/>
 				</Anchors>
@@ -60,8 +60,6 @@
 
 
 			<Layer level="BACKGROUND">
-
-			
 				<Texture parentKey="icon">
 					<Size x="15" y="15"/>
 					<Anchors>
@@ -129,16 +127,16 @@
 		<Size x="35" y="35"/>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture parentKey="green" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\green"/>
+				<Texture parentKey="green" setAllPoints="true" texture="Interface\AddOns\Questra\artwork\Eye\green"/>
 			</Layer>
 			<Layer level="ARTWORK">
-				<Texture parentKey="pupil" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\pupil"/>
-				<Texture parentKey="shine" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\shine"/>
+				<Texture parentKey="pupil" setAllPoints="true" texture="Interface\AddOns\Questra\artwork\Eye\pupil"/>
+				<Texture parentKey="shine" setAllPoints="true" texture="Interface\AddOns\Questra\artwork\Eye\shine"/>
 
 			</Layer>
 			<Layer level="OVERLAY">
-				<Texture parentKey="upper" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\eyelids\upper1"/>
-				<Texture parentKey="lower" setAllPoints="true" texture="Interface\AddOns\Quest_Compass\artwork\Eye\eyelids\lower1"/>
+				<Texture parentKey="upper" setAllPoints="true" texture="Interface\AddOns\Questra\artwork\Eye\eyelids\upper1"/>
+				<Texture parentKey="lower" setAllPoints="true" texture="Interface\AddOns\Questra\artwork\Eye\eyelids\lower1"/>
 
 				<Texture parentKey="Highlight" hidden="true" alpha="0" alphaMode="ADD" atlas="groupfinder-eye-highlight" useAtlasSize="true">
 					<Anchors>
@@ -199,6 +197,9 @@
 			</AnimationGroup>
 		</Animations>
 	</Frame>
+
+
+	<Frame name="QuestraPinTemplate" inherits="BaseHighlightableMapPoiPinTemplate" mixin="FlightPointPinMixin" virtual="true" />
 
 
 </Ui>

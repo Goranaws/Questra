@@ -1,8 +1,8 @@
-## Interface: 80300
+## Interface: 90100
 ## Title: Questra
 ## Notes: Compass styled navigation!
 ## Author: Goranaws
-## Version: 1
+## Version: 1.5
 ## SavedVariables: Questra_DB, Questra_AltDB
 
 libs\LibStub\LibStub.lua
@@ -10,5 +10,11 @@ libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 libs\HereBeDragons\HereBeDragons-2.0.lua
 libs\ChatThrottleLib\ChatThrottleLib.xml
 
+Questra.lua
+
 template.xml
 frame.lua
+pingAnywhere.lua
+transitAuthority.lua
+groupButton.lua
+itemButton.lua
