@@ -13,7 +13,7 @@ Questra.HBD = HBD
 
 do
 	Questra.Elements = {}
-	
+
 	function Questra:AddElement(elementDetails)
 		tinsert(Questra.Elements, elementDetails)
 	end
@@ -23,14 +23,13 @@ do
 			local parentElement = Questra[elementDetails.parentElementName]
 			Questra[elementDetails.name] = Questra[elementDetails.name] or elementDetails.Build(parentElement)
 			local element = Questra[elementDetails.name]
-			
 			if parentElement then
 				parentElement[elementDetails.name] = parentElement[elementDetails.name] or element
 			end
 			elementDetails.element = element
 		end
 	end
-	
+
 	function Questra:EnableElementScripts()
 		for i, elementDetails in pairs(Questra.Elements) do
 			local element = elementDetails.element
@@ -46,7 +45,7 @@ do
 			end
 		end
 	end
-	
+
 	function Questra:UpdateElements()
 		for i, elementDetails in pairs(Questra.Elements) do
 			local element = elementDetails.element
@@ -56,7 +55,7 @@ do
 			end
 		end
 	end
-	
+
 	function Questra:OnPostLoad()
 		for i, elementDetails in pairs(Questra.Elements) do
 			local element = elementDetails.element
@@ -66,7 +65,7 @@ do
 			end
 		end
 	end
-	
+
 	function Questra:OnLocationUpdate(x, y, mapID, destX, destY, destMapID, playerAngle, angle, oID_World)
 		for i, elementDetails in pairs(Questra.Elements) do
 			local element = elementDetails.element
@@ -76,7 +75,7 @@ do
 			end
 		end
 	end
-	
+
 	function Questra:OnPostLocationUpdate(x, y, mapID, destX, destY, destMapID, icon, L, R, T, B, skinDetails, textureIndex)
 		for i, elementDetails in pairs(Questra.Elements) do
 			local element = elementDetails.element
@@ -86,7 +85,7 @@ do
 			end
 		end
 	end
-	
+
 	function Questra:OnQuestUpdate(questID)
 		for i, elementDetails in pairs(Questra.Elements) do
 			local element = elementDetails.element
@@ -96,7 +95,6 @@ do
 			end
 		end
 	end
-	
 end
 
 do --custom pins
@@ -119,7 +117,6 @@ do --custom pins
 			local factionGroup = UnitFactionGroup("player");
 			for i, portalNodeInfo in ipairs(portalNodes) do
 				if portalNodeInfo.hidden ~= true then
-				--if self:ShouldShowTaxiNode(factionGroup, portalNodeInfo) then
 					local pin = pins[portalNodeInfo.nodeID] or self:GetMap():AcquirePin("QuestraPinTemplate", portalNodeInfo)
 					pin:EnableMouse(true)
 

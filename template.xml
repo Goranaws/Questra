@@ -23,10 +23,10 @@
 	
 	<Button name="QuestraItemButtonTemplate" inherits="SecureActionButtonTemplate" hidden="true" virtual="true">
 		<Size x="35" y="35"/>
-<!-- 		<Anchors>
+<!-- 	<Anchors>
 			<Anchor point="CENTER" relativeKey="$parent.navButton" relativePoint="RIGHT" x="-8" y="-17"/>
 		</Anchors>
- -->		<Frames>
+ -->	<Frames>
 			<Frame parentKey="textureHandler" useParentLevel="true">
 				<Size x="35" y="35"/>
 				<Anchors>
@@ -61,9 +61,10 @@
 
 			<Layer level="BACKGROUND">
 				<Texture parentKey="icon">
-					<Size x="15" y="15"/>
+					<Size x="20" y="20"/>
 					<Anchors>
-						<Anchor point="CENTER" relativeKey="$parent.textureHandler" x="0" y="0"/>
+						<Anchor point="Topleft" relativeKey="$parent.textureHandler" x="7.5" y="-7.5"/>
+						<Anchor point="BottomRight" relativeKey="$parent.textureHandler" x="-7.5" y="7.5"/>
 					</Anchors>
 				</Texture>
 			</Layer>
@@ -75,10 +76,21 @@
 			<OnUpdate function="QuestObjectiveItem_OnUpdate"/>
 			<OnShow function="QuestObjectiveItem_OnShow"/>
 			<OnHide function="QuestObjectiveItem_OnHide"/>
-			<OnEnter function="QuestObjectiveItem_OnEnter"/>
 			<OnLeave>
 				GameTooltip:Hide();
 			</OnLeave>
+			<OnMouseDown>
+				if self.width and self.height then
+					self.textureHandler:SetSize(self.width -3, self.height + 5)
+					self.textureHandler:SetPoint("Center", self, -2, 1)
+				end
+			</OnMouseDown>
+			<OnMouseUp>
+				if self.width and self.height then
+					self.textureHandler:SetSize(self.width, self.height)
+					self.textureHandler:SetPoint("Center", self)
+				end
+			</OnMouseUp>
 		</Scripts>
 		
 		<HighlightTexture parentKey="Light" file="Interface\Artifacts\Artifacts-PerkRing-Final-Mask" alphaMode="ADD">
@@ -93,6 +105,16 @@
 				<Anchor point="BOTTOMRIGHT" relativeKey="$parent.textureHandler" x="0" y="0"/>
 			</Anchors>
 		</NormalTexture>
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 	</Button>
 	
 
@@ -122,6 +144,21 @@
 			</AnimationGroup>
 		</Animations>
 	</Button>
+
+
+	<Frame name="Questra_AltRouteFlash" hidden = "true" virtual="true">
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture parentKey="flash" hidden="true" setAllPoints="true"/>
+			</Layer>
+		</Layers>
+		<Animations>
+			<AnimationGroup parentKey="flashAnimation" setToFinalAlpha="true" looping="REPEAT">
+				<Alpha childKey="flash" fromAlpha="1.0" toAlpha=".5" duration=".75" order="1"/>
+				<Alpha childKey="flash" fromAlpha=".5" toAlpha="1" startDelay=".75" duration=".75" order="1"/>
+			</AnimationGroup>
+		</Animations>
+	</Frame>
 
 	<Button name="Q_C_GroupFinderButton" virtual="true">
 		<Size x="35" y="35"/>

@@ -1,5 +1,12 @@
 local AddonName, Questra = ...
 local HBD = Questra.HBD
+local FlyPaper = LibStub('LibFlyPaper-2.0')
+
+Questra.sets = {}
+
+Questra.ignoredIDS = {}
+Questra.ignoredTYPES = {}
+
 
 local prin = print
 local lastPrint
@@ -67,10 +74,14 @@ local defaults = {
 function Questra:OnEnable()
 	Questra_DB = Questra_DB or {}
 	
+	Questra_DB.widgets = Questra_DB.widgets or {}
+	
 	Questra:SaveAndRestoreTracking()
 	
 	Questra.BuildElements()
 
+	Questra:LoadTrackingOptions()
+	
 	Questra:EnableElementScripts()
 	
 	Questra:OnPostLoad()
@@ -82,6 +93,8 @@ function Questra:OnEnable()
 	WorldMapFrame:AddDataProvider(CreateFromMixins(QuestraDataProviderMixin));
 	
 	--Questra:GetOrCreatePortalDataCollector()
+	
+	
 end
 
 do --odds and ends...
@@ -172,6 +185,25 @@ do --odds and ends...
 				return x, y, mapID
 			end
 		end
+
+
+	Questra.questTypes  =	{ 
+		"Profession", --1
+		"", --2
+		"PvP", --3
+		"Pet Battle", --4
+		"Bounty", --5
+		"Dungeon", --6
+		"Invasion", --7
+		"Raid", --8
+		"Contribution", --9
+		"Rated", --10
+		"Invasion", --11
+		"Faction Assault", --12
+		"Islands", --13
+		"Threat", --14
+		"Covenant Calling", --15
+	}
 end
 
 do --map shortcuts
@@ -231,7 +263,7 @@ end
 
 do --visual display functions
 	local trackingIndex = 1
-
+Questra.trackingIndex = trackingIndex
 	function Questra:GetTracking()
 		return trackingIndex or 1
 	end
@@ -241,15 +273,18 @@ do --visual display functions
 	end
 
 	function Questra:UpdateTracking(delta)
+	
+	prin(#Questra.typesIndex)
+	
 		trackingIndex = trackingIndex and trackingIndex - delta or 1
 		trackingIndex = trackingIndex > #Questra.typesIndex and 1
 			or trackingIndex < 1 and #Questra.typesIndex
 			or trackingIndex --rollover from start to finish or finish to start
 
-		local i = Questra.typesIndex[trackingIndex]
+		local trackingName = Questra.typesIndex[trackingIndex]
 
-		if not (i == "dungeon" or i == "flight" or i == "offer") then
-			Questra.lastSwap = Questra.typesIndex[trackingIndex]
+		if not (trackingName == "dungeon" or trackingName == "flight" or trackingName == "offer" or trackingName == "achievement") then
+			Questra.lastSwap = trackingName
 		end
 	end
 
@@ -259,11 +294,16 @@ do --visual display functions
 		for i, track in pairs(Questra.tracking) do
 			track.OnEvent(event)
 
-			local shouldShow = track.ShouldShow()
+			local shouldShow = track.ShouldShow() == true
 
-			if shouldShow then
+			if track.sets and track.sets.disable == true then
+				shouldShow = nil
+			end
+
+			if shouldShow == true then
 				if not tContains(Questra.typesIndex, track.trackingName) then
 					tinsert(Questra.typesIndex, track.trackingName)
+					--tinsert(Questra.typesIndex, tIndexOf(Questra.addedIndex, track.trackingName), track.trackingName)
 				end
 			else
 				if tContains(Questra.typesIndex, track.trackingName) then
@@ -279,7 +319,7 @@ do --visual display functions
 		local newAutoSwap
 		for i, track in pairs(Questra.tracking) do
 			local shouldSwap, metric = track.ShouldAutoSwap()
-			if shouldSwap and not newAutoSwap then
+			if shouldSwap == true and not newAutoSwap then
 				newAutoSwap = tIndexOf(Questra.typesIndex, track.trackingName)
 				Questra.lastSwap = track.trackingName
 				track.SetToMetric(metric)
@@ -290,6 +330,8 @@ do --visual display functions
 				return
 			end
 		end
+		
+		Questra:CollectUpdate()
 	end
 
 	function Questra:GetTracked()
@@ -298,11 +340,9 @@ do --visual display functions
 
 	function Questra:CollectUpdate()
 		local tracker = Questra:GetTracked()
-
-
+		if not tracker then return end
 		--colorize
 		Questra.TrackerScrollButton:GetNormalTexture():SetVertexColor(unpack(tracker.color))
-
 
 		local skinDetails, position, texture, l, r, t, b, extra, textureIndex = Questra.basicSkin, nil, nil, 0, 1, 0, 1, nil
 		if tracker then
@@ -311,8 +351,8 @@ do --visual display functions
 			self.pin.icon:SetTexture("")
 			self.pin.icon:SetTexCoord(0,1,0,1)
 			self.distanceText:SetText("")
-			self.pin.arrow:Hide()
-			self.pin.arrow:SetRotation(0)
+			self.pin.compassArrow:Hide()
+			self.pin.compassArrow:SetRotation(0)
 		end
 
 		Questra.storedUpdate = {
@@ -326,6 +366,8 @@ do --visual display functions
 			questID = (extra and type(extra) ~= "boolean") and extra or nil,
 			textureIndex = textureIndex
 		}
+	
+		Questra:Update()
 	end
 
 	function Questra:Update()
@@ -346,6 +388,7 @@ do --visual display functions
 		if oX and oY and oID and dX and dY and dID then
 		
 			dX, dY, dID = Questra:GetAlternateWaypoints(dX, dY, dID)
+			
 
 			local oX_World, oY_World, oID_World  = HBD:GetWorldCoordinatesFromZone(oX, oY, oID)
 			local dX_World, dY_World, dID_World  = HBD:GetWorldCoordinatesFromZone(dX, dY, dID)
@@ -389,21 +432,16 @@ do --Visual display elements
 	Questra:AddElement({
 		name = "frame",
 		Build = function()
+			Questra_DB = Questra_DB or {}
+			Questra_AltDB = Questra_AltDB or {}
+			Questra.sets = Questra_AltDB
+		
 			local frame = CreateFrame("Frame", AddonName.."_Frame", UIParent)
 			frame:SetFrameStrata("BACKGROUND")
 			frame:SetFixedFrameStrata(true)
 			frame:SetPoint("Center", 0, -250)
 			frame:SetSize(size, size)
 
-			frame.dragFrame = CreateFrame("Button", AddonName.."_dragFrame", frame)
-				frame.dragFrame:SetFrameStrata("MEDIUM")
-				frame.dragFrame:SetFixedFrameStrata(true)
-				frame.dragFrame:SetAllPoints(frame)
-				frame.dragFrame:Hide()
-
-				frame.dragFrame.texture = frame.dragFrame:CreateTexture(nil, "OVERLAY")
-				frame.dragFrame.texture:SetColorTexture(0, 1, 0, .45)
-				frame.dragFrame.texture:SetAllPoints(frame.dragFrame)
 			return frame
 		end,
 		
@@ -411,22 +449,20 @@ do --Visual display elements
 			for i, b in pairs(Questra.Events) do
 				self:RegisterEvent(b)
 			end
+		
+			FlyPaper.AddFrame(AddonName, 1, self)
+			
+			
+			if Questra:IsAnchored() then
+				Questra:RestoreAnchor()
+			else
+				Questra:RestorePosition()
+			end
 		end,
 		
 		scripts = {
 			OnLoad = function(self)
-				self.dragFrame:SetScript("OnMouseDown", function(self)
-					self:GetParent():SetMovable(true)
-					self:GetParent():StartMoving()
-				end)
-				self.dragFrame:SetScript("OnMouseUp"  , function(self, button)
-					self:GetParent():StopMovingOrSizing()
-				end)
-				self.dragFrame:SetScript("OnLeave", function(self, button)
-					if self:IsVisible() then
-						self:Hide()
-					end
-				end)
+
 			end,
 			OnEvent = function(self, event, ...)
 				if not self.runnin then
@@ -451,16 +487,15 @@ do --Visual display elements
 				end
 			end,
 			OnLeave = function(self)
-				if self.dragFrame:IsVisible() and not MouseIsOver(self.dragFrame) then
-					self.dragFrame:Hide()
-				end
+
 			end,
 		},
 	})
 	
 	do --waypoint icon, arrow and tooltip
-		local pin = {name = "pin", parentElementName = "frame",Build = function(parentElement, ...)
-			local button = CreateFrame("Button",  AddonName.."NavigationButton", parentElement)
+		local pin = {name = "pin", parentElementName = "frame",}
+		function pin:Build(...)
+			local button = CreateFrame("Button",  AddonName.."NavigationButton", self)
 
 			button:SetSize(_size, _size)
 			button:SetPoint("TOP", 0, 7)
@@ -479,6 +514,8 @@ do --Visual display elements
 				button.bg:SetPoint("Center")
 				button.bg:SetSize(_size - 30, _size - 30)
 
+			button.bg:SetDrawLayer("BACKGROUND", 2)
+
 			button.push = button:GetPushedTexture()
 				button.push:SetAllPoints(button.bg)
 
@@ -486,31 +523,34 @@ do --Visual display elements
 			button.bg:SetDrawLayer("BACKGROUND")
 
 
-			button.border = button:CreateTexture(nil, "LOW", 3)
+			button.border = button:CreateTexture(nil, "BORDER", 3)
 				button.border:SetAllPoints(button)
 				button.border:SetAtlas("auctionhouse-itemicon-border-artifact")
 
-			button.hl = button:CreateTexture(nil, "OVERLAY", 1)
+			button.hl = button:CreateTexture(nil, "HIGHLIGHT", 1)
 				button.hl:SetPoint("Center")
 				button.hl:SetSize(_size - 30, _size - 30)
 				button.hl:Hide()
 
 				button.hl:SetTexture(166862)
 
-			button.arrow = button:CreateTexture(nil, "OVERLAY", 25)
-				button.arrow:SetAllPoints(button)
-				button.arrow:SetTexture(Questra.textures.RingArrow)
+			button.compassArrow = button:CreateTexture(nil, "OVERLAY", 25)
+				button.compassArrow:SetAllPoints(button)
+				button.compassArrow:SetTexture(Questra.textures.RingArrow)
 				
-			button.metricIndicator = button:CreateTexture(nil, "OVERLAY", 15)
-				button.metricIndicator:SetAllPoints(button)
-				button.metricIndicator:SetTexture(Questra.textures.metricIndicator)
+			button.metricDial = button:CreateTexture(nil, "BACKGROUND", 1)
+				button.metricDial:SetAllPoints(button)
+				button.metricDial:SetTexture(Questra.textures.metricDial)
 				
 			button.icon = button:CreateTexture(nil, "LOW", 1)
+			button.icon:SetDrawLayer("BACKGROUND", 7)
 				button.icon:SetPoint("Center", 1, 0)
 				button.icon:SetSize(_size - 40, _size - 40)
+				button.icon.width, button.icon.height = button.icon:GetSize()
+			
 			
 			return button
-		end}
+		end
 			
 		function pin:OnPostLoad()
 			Questra:UpdateDisplayed("Forced")
@@ -526,16 +566,21 @@ do --Visual display elements
 
 		function pin:OnLocationUpdate(x, y, mapID, destX, destY, destMapID, playerAngle, angle)
 			if angle and playerAngle then
-				self.arrow:Show()
-				self.arrow:SetRotation(rad((deg(angle) - deg(playerAngle))))
+				self.compassArrow:Show()
+				self.compassArrow:SetRotation(rad((deg(angle) - deg(playerAngle))))
 			else
-				self.arrow:Hide()
-				self.arrow:SetRotation(0)
+				self.compassArrow:Hide()
+				self.compassArrow:SetRotation(0)
 			end
 			
-			local _min, _max = 0, 180
+					
+			local _min, _max = 0, 210
 			
 			local tracker = Questra:GetTracked()
+			if not tracker then
+				return
+			end
+			
 			local _Min, _Max
 
 			if tracker.metrics and tracker.GetScrollValue() then
@@ -545,11 +590,11 @@ do --Visual display elements
 			local percent = 0
 			if (_Min and _Max) and _Max ~= 1 then
 				local percent = (_Min-1) / (_Max-1)
-				self.metricIndicator:Show()
-				self.metricIndicator:SetRotation(-rad(180 * percent))
+				self.metricDial:Show()
+				self.metricDial:SetRotation(-rad(_max * percent))
 			else
-				self.metricIndicator:Hide()
-				self.metricIndicator:SetRotation(0)
+				self.metricDial:Hide()
+				self.metricDial:SetRotation(0)
 				return
 			end
 		end
@@ -604,12 +649,16 @@ do --Visual display elements
 				Questra:Update()
 			end,
 			OnMouseDown = function(self, button)
-
+				self.icon:SetSize(self.icon.width-5, self.icon.height-5)
 			end,
 			OnMouseUp = function(self, button)
-				local tracker = Questra:GetTracked()
-				if tracker then
-					tracker.OnClick(button)
+				self.icon:SetSize(self.icon.width, self.icon.height)
+			
+				if MouseIsOver(self) then
+					local tracker = Questra:GetTracked()
+					if tracker then
+						tracker.OnClick(button)
+					end
 				end
 			end,
 			OnEnter = function(self)
@@ -734,160 +783,102 @@ do --Visual display elements
 		end,
 	})
 	
-	Questra:AddElement({
-		name = "TrackerScrollButton",
-		parentElementName = "frame",
-		Build = function(parentElement, ...)
-			local button = CreateFrame("Button", "Questra_notifyButton", parentElement)
-			button:SetPoint("TopLeft", parentElement.pin, "BottomLeft", 0 , 25)
-			button:SetPoint("BottomRight", parentElement.pin, 0, 0)
-
-			button:SetHighlightTexture(Questra.textures.NotifyBridgeHighlight)
-			button:SetPushedTexture(Questra.textures.NotifyBridgeBackGround)
-			button:SetNormalTexture(Questra.textures.NotifyBridgeBackGround)
-			button:SetHitRectInsets(15, 15, 0, 0)
-
-			button:SetFrameStrata("LOW")
-			button:SetFrameLevel(1)
-			button:SetFixedFrameStrata(true)
-
-			button.border = button:CreateTexture(nil, "LOW")
-			button.border:SetAllPoints(button)
-			button.border:SetTexture(Questra.textures.NotifyBridgeBorder)
-			
-			return button
-		end,
-		scripts = {
-			OnMouseWheel = function(self, delta)
-				Questra:UpdateDisplayed("Forced")
-
-				Questra:UpdateTracking(delta)
-
-				Questra:CollectUpdate()
-				Questra:Update()
-				self:GetScript("OnEnter")(self)
-			end,
-			OnEnter = function(self)
-				local tracker = Questra:GetTracked()
-				GameTooltip:SetOwner(Questra.TrackerScrollButton, "ANCHOR_LEFT")
-
-				GameTooltip:SetText(tracker.displayText, 1, 1, 1)
-				if tracker.metrics and tracker.GetScrollValue() then
-					GameTooltip:AddDoubleLine("Displayed:", tracker.GetScrollValue().." / "..#tracker.metrics)
-				end
-				GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
-				GameTooltip:Show()
-			end,
-			OnLeave = function(self)
-				GameTooltip:Hide()
-			end,
-		},
-	})
-
-	Questra:AddElement({
-		name = "anchorButton",
-		parentElementName = "frame",
-		Build = function(parentElement, ...)
-			local button = CreateFrame("Button", AddonName.."_AnchorButton", parentElement)
-			button:SetSize(8, 15)
-			button:SetPoint("Right", parentElement.coordinateText, "Left", -1, 0)
-
-			button:SetFrameStrata("LOW")
-			button:SetFrameLevel(1)
-			button:SetFixedFrameStrata(true)
-
-			button:SetHighlightTexture(Questra.textures.LeftArrowHighlight)
-			button:SetPushedTexture(Questra.textures.LeftArrowPushed)
-			button:SetNormalTexture(Questra.textures.LeftArrow)
-			--button:GetHighlightTexture():SetBlendMode("ADD")
-			button:RegisterForClicks("AnyUp")
-
-			button:GetNormalTexture():SetVertexColor(202/255,165/255,0, 1)
-			button:GetPushedTexture():SetVertexColor(202/255,165/255,0, 1)
-			button:GetHighlightTexture():SetVertexColor(202/255,165/255,0, 1)
-			
-			return button
-		end,
-		scripts = {
-			OnMouseUp = function(self)
-				local x, y, mapID = Questra.GetPlayerPosition()
-				
-				local track = Questra.trackByName.way
-				
-				if x and y and mapID then
-					local metric = mapID..x..y
-					if metric and not track.referenceDetails[metric] then
-						local details = {title = "Anchor", tooltip = "Did you want to return to this spot?", x = floor(x*10000) / 10000 , y = floor(y*10000) / 10000 , mapID = mapID, icon = "anchor", _time = GetTime()}
-
-						details.time = GetTime()
-						tinsert(track.metrics, 1, details)
-						details.referenceDetailsIndex = metric
-						track.referenceDetails[metric] = details
-					end
-				end
-			end,
-			OnLeave = function(self)
-			
-			end,
-			OnEnter = function(self)
-				
-			end,
-		},
-	})
+	do--metric indicator
 	
-	Questra:AddElement({
-		name = "SaveButton",
-		parentElementName = "frame",
-		Build = function(parentElement, ...)
-			local button = CreateFrame("Button", AddonName.."_SaveButton", parentElement)
-			button:SetSize(8, 15)
-			button:SetPoint("Left", parentElement.coordinateText, "Right", 1, 0)
+			local function dropDown(self)
+				local info = UIDropDownMenu_CreateInfo();
+				info.text = Questra.possibleWaypont and "Follow Alternate Waypoint" or Questra.portalSense and "Clear Waypoint"
+				info.notCheckable = 1;
+				info.func = function()
+					Questra.portalSense = not Questra.portalSense and Questra.possibleWaypont or nil
+				end
+				UIDropDownMenu_AddButton(info, UIDROPDOWN_MENU_LEVEL);
+			end
+	
+	
+		Questra:AddElement({
+			name = "TrackerScrollButton",
+			parentElementName = "frame",
+			Build = function(parentElement, ...)
+				local button = CreateFrame("Button", "Questra_notifyButton", parentElement)
+				button:SetPoint("TopLeft", parentElement.pin, "BottomLeft", 0 , 25)
+				button:SetPoint("BottomRight", parentElement.pin, 0, 0)
 
-			button:SetFrameStrata("LOW")
-			button:SetFrameLevel(1)
-			button:SetFixedFrameStrata(true)
+				button:SetHighlightTexture(Questra.textures.NotifyBridgeHighlight)
+				button:SetPushedTexture(Questra.textures.NotifyBridgeBackGround)
+				button:SetNormalTexture(Questra.textures.NotifyBridgeBackGround)
+				button:SetHitRectInsets(15, 15, 0, 0)
 
-			button:SetHighlightTexture(Questra.textures.LeftArrowHighlight)
-			button:SetPushedTexture(Questra.textures.LeftArrowPushed)
-			button:SetNormalTexture(Questra.textures.LeftArrow)
-			button:GetHighlightTexture():SetTexCoord(1,0,0,1)
-			button:GetHighlightTexture():SetBlendMode("ADD")
-			button:GetNormalTexture():SetTexCoord(1,0,0,1)
-			button:GetPushedTexture():SetTexCoord(1,0,0,1)
+				button:SetFrameStrata("LOW")
+				button:SetFrameLevel(1)
+				button:SetFixedFrameStrata(true)
 
-			button:GetNormalTexture():SetVertexColor(202/255,165/255,0, 1)
-			button:GetPushedTexture():SetVertexColor(202/255,165/255,0, 1)
-			button:GetHighlightTexture():SetVertexColor(202/255,165/255,0, 1)
-			
-			return button
-		end,
-		scripts = {
-			OnMouseUp = function(self)
-				-- local x, y, mapID = Questra.GetPlayerPosition()
+				button.border = button:CreateTexture(nil, "LOW")
+				button.border:SetAllPoints(button)
+				button.border:SetTexture(Questra.textures.NotifyBridgeBorder)
 				
-				-- local track = Questra.trackByName.way
-				
-				-- if x and y and mapID then
-					-- local metric = mapID..x..y
-					-- if metric and not track.referenceDetails[metric] then
-						-- local details = {title = "Anchor", tooltip = "Did you want to return to this spot?", x = floor(x*10000) / 10000 , y = floor(y*10000) / 10000 , mapID = mapID, icon = "anchor", _time = GetTime()}
 
-						-- details.time = GetTime()
-						-- tinsert(track.metrics, 1, details)
-						-- details.referenceDetailsIndex = metric
-						-- track.referenceDetails[metric] = details
-					-- end
-				-- end
-			end,
-			OnLeave = function(self)
-			
-			end,
-			OnEnter = function(self)
+				button.AltRouteFlasher = CreateFrame("Frame", nil, button, "Questra_AltRouteFlash")
+				button.AltRouteFlasher:SetAllPoints(button.border)
+				button.AltRouteFlasher.flash:SetTexture(Questra.textures.MetricFlash)
 				
+				button.AltRouteFlasher.flashAnimation:Play()
+				
+				return button
 			end,
-		},
-	})	
+			scripts = {
+				OnMouseWheel = function(self, delta)
+					Questra:UpdateDisplayed("Forced")
 
+					Questra:UpdateTracking(delta)
+
+					Questra:CollectUpdate()
+					Questra:Update()
+					self:GetScript("OnEnter")(self)
+				end,
+				OnEnter = function(self)
+					local tracker = Questra:GetTracked()
+					if not tracker then return end
+					GameTooltip:SetOwner(Questra.TrackerScrollButton, "ANCHOR_LEFT")
+
+					GameTooltip:SetText(tracker.displayText, 1, 1, 1)
+					if tracker.metrics and tracker.GetScrollValue() then
+						GameTooltip:AddDoubleLine("Displayed:", tracker.GetScrollValue().." / "..#tracker.metrics)
+					end
+					
+					if Questra.possibleWaypont then
+						GameTooltip:AddLine("Alternate Route Available")
+						GameTooltip:AddLine("Click to take alternate Waypoint")
+					
+					elseif Questra.portalSense then
+						GameTooltip:AddLine("Following Alternate Route")
+						GameTooltip:AddLine("Click to clear alternate Waypoint")
+					end
+										
+					if Questra.ignoredTYPES and #Questra.ignoredTYPES >= 1 then
+						GameTooltip:AddLine("Ignored Quest Types:")
+
+						for i, b in pairs(Questra.ignoredTYPES) do
+							local _ = Questra.questTypes[b] and GameTooltip:AddLine("  -"..Questra.questTypes[b])
+						end
+					end
+					
+					GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
+					GameTooltip:Show()
+				end,
+				OnLeave = function(self)
+					GameTooltip:Hide()
+				end,
+				OnMouseUp = function(self, btn)
+					ObjectiveTracker_ToggleDropDown(self, dropDown)
+					local p1, p2 = Questra.GetAnchorsNearestScreenCenter(self)
+					DropDownList1:ClearAllPoints()
+					DropDownList1:SetPoint(p2, self, p1)
+				end
+			},
+		})
+	end
+	
 	Questra:AddElement({
 		name = "distanceText",
 		parentElementName = "TrackerScrollButton",
@@ -1006,6 +997,288 @@ do --Visual display elements
 			self.waypointMarker:SetSize(15 , 15 )
 		end
 	})	
+	
+	Questra:AddElement({
+		name = "anchorButton",
+		parentElementName = "frame",
+		Build = function(parentElement, ...)
+			local button = CreateFrame("Button", AddonName.."_AnchorButton", parentElement)
+			button:SetSize(8, 15)
+			button:SetPoint("Right", parentElement.coordinateText, "Left", -1, 0)
+
+			button:SetFrameStrata("LOW")
+			button:SetFrameLevel(1)
+			button:SetFixedFrameStrata(true)
+
+			button:SetHighlightTexture(Questra.textures.LeftArrowHighlight)
+			button:SetPushedTexture(Questra.textures.LeftArrowPushed)
+			button:SetNormalTexture(Questra.textures.LeftArrow)
+			--button:GetHighlightTexture():SetBlendMode("ADD")
+			button:RegisterForClicks("AnyUp")
+
+			button:GetNormalTexture():SetVertexColor(202/255,165/255,0, 1)
+			button:GetPushedTexture():SetVertexColor(202/255,165/255,0, 1)
+			button:GetHighlightTexture():SetVertexColor(202/255,165/255,0, 1)
+			
+			return button
+		end,
+		scripts = {
+			OnMouseUp = function(self)
+				local x, y, mapID = Questra.GetPlayerPosition()
+				
+				local track = Questra.trackByName.way
+				
+				if x and y and mapID then
+					local metric = mapID..x..y
+					if metric and not track.referenceDetails[metric] then
+						local details = {title = "Anchor", tooltip = "Did you want to return to this spot?", x = floor(x*10000) / 10000 , y = floor(y*10000) / 10000 , mapID = mapID, icon = "anchor", _time = GetTime()}
+
+						details.time = GetTime()
+						tinsert(track.metrics, 1, details)
+						details.referenceDetailsIndex = metric
+						track.referenceDetails[metric] = details
+					end
+				end
+			end,
+			OnLeave = function(self)
+			
+			end,
+			OnEnter = function(self)
+				
+			end,
+		},
+	})
+	
+	Questra:AddElement({
+		name = "SaveButton",
+		parentElementName = "frame",
+		Build = function(parentElement, ...)
+			local button = CreateFrame("Button", AddonName.."_SaveButton", parentElement)
+			button:SetSize(8, 15)
+			button:SetPoint("Left", parentElement.coordinateText, "Right", 1, 0)
+
+			button:SetFrameStrata("LOW")
+			button:SetFrameLevel(1)
+			button:SetFixedFrameStrata(true)
+
+			button:SetHighlightTexture(Questra.textures.LeftArrowHighlight)
+			button:SetPushedTexture(Questra.textures.LeftArrowPushed)
+			button:SetNormalTexture(Questra.textures.LeftArrow)
+			button:GetHighlightTexture():SetTexCoord(1,0,0,1)
+			button:GetHighlightTexture():SetBlendMode("ADD")
+			button:GetNormalTexture():SetTexCoord(1,0,0,1)
+			button:GetPushedTexture():SetTexCoord(1,0,0,1)
+
+			button:GetNormalTexture():SetVertexColor(202/255,165/255,0, 1)
+			button:GetPushedTexture():SetVertexColor(202/255,165/255,0, 1)
+			button:GetHighlightTexture():SetVertexColor(202/255,165/255,0, 1)
+			
+			return button
+		end,
+		scripts = {
+			OnMouseUp = function(self)
+				-- local x, y, mapID = Questra.GetPlayerPosition()
+				
+				-- local track = Questra.trackByName.way
+				
+				-- if x and y and mapID then
+					-- local metric = mapID..x..y
+					-- if metric and not track.referenceDetails[metric] then
+						-- local details = {title = "Anchor", tooltip = "Did you want to return to this spot?", x = floor(x*10000) / 10000 , y = floor(y*10000) / 10000 , mapID = mapID, icon = "anchor", _time = GetTime()}
+
+						-- details.time = GetTime()
+						-- tinsert(track.metrics, 1, details)
+						-- details.referenceDetailsIndex = metric
+						-- track.referenceDetails[metric] = details
+					-- end
+				-- end
+			end,
+			OnLeave = function(self)
+			
+			end,
+			OnEnter = function(self)
+				
+			end,
+		},
+	})	
+
+	local optionsParent
+
+	local optionPanels = {	
+	}
+
+	local scrollPanel
+
+	local optionItems = {}
+	
+	function optionItems.CheckButton(parent, optionDetails)
+		local checkButton = CreateFrame("CheckButton", parent:GetName()..optionDetails.title, parent, "UICheckButtonTemplate")
+		checkButton.text:SetText(optionDetails.title)
+		checkButton:SetScript("OnClick", optionDetails.OnClick)
+		checkButton:SetScript("OnShow", optionDetails.OnShow)
+		optionDetails.OnShow(checkButton)
+	
+		return checkButton
+	end
+
+
+	function Questra:NewOptionPanel(optionInfo)
+		optionInfo.panel = CreateFrame("Frame", optionsParent:GetName().."_"..optionInfo.name, optionsParent)
+	
+		optionInfo.panel.bg = optionInfo.panel:CreateTexture(nil, 'BACKGROUND', 2)
+		optionInfo.panel.bg:SetColorTexture(0, 0, 0, .5)
+		optionInfo.panel.bg:SetAllPoints(optionInfo.panel)
+		optionInfo.panel:SetSize(180, 250)
+		optionInfo.panel:SetPoint("TopLeft", optionsParent, (#optionPanels == 0) and 0 or (190 *  #optionPanels), -3)
+		if optionInfo.options then
+			optionInfo.panel.Items = {}
+		
+			for i, optionDetails in pairs(optionInfo.options) do
+				local item = optionItems[optionDetails.kind]
+				if item then
+					local object = item(optionInfo.panel ,optionDetails)
+				
+					object:SetPoint("TopLeft", 0, -(#optionInfo.panel.Items * 25))
+					
+					tinsert(optionInfo.panel.Items, object)
+				end
+			end
+
+		end
+		if #optionPanels < 1 then
+			scrollPanel.selector.Text:SetText(optionInfo.name)
+		end
+	
+		tinsert(optionPanels, optionInfo)
+	end
+
+
+	local function dropDownr(self)
+		 for i, optionInfo in pairs(optionPanels) do
+			local info = UIDropDownMenu_CreateInfo();
+			info.text = optionInfo.name
+			info.notCheckable = 1;
+			info.func = function()
+				scrollPanel:SetHorizontalScroll( (i-1) * 190)
+			
+				scrollPanel.selector.Text:SetText(optionInfo.name)
+			end
+			UIDropDownMenu_AddButton(info, UIDROPDOWN_MENU_LEVEL);
+		end
+	end
+
+	Questra:AddElement({
+		name = "options",
+		parentElementName = "frame",
+		Build = function(parentElement)
+			local options = CreateFrame("Frame", AddonName.."_options", UIParent, "TooltipBorderedFrameTemplate")
+				options:SetFrameStrata("MEDIUM")
+				options:SetFixedFrameStrata(true)
+				--'options:Hide()
+				options:SetSize(200, 300)
+				parentElement.options = options
+				options:SetPoint("CENTER")
+				
+				options.close = CreateFrame("Button", options:GetName().."_closeButton", options, "UIPanelCloseButton")
+				options.close:SetPoint("TopRight")
+				
+				options.Title = options:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+				options.Title:SetPoint("TopLeft", options, 10, -10)
+				options.Title:SetJustifyH("Left")
+				options.Title:SetPoint("TopRight", options.close, "TopLeft")
+				options.Title:SetText("Questra")
+				
+				options.selector = CreateFrame("Button", options:GetName().."dropDownSelector", options, "UIDropDownMenuTemplate")
+				options.selector:SetPoint("TopLeft", options.Title, "BottomLeft", 0, -7)
+				options.selector:SetWidth(150)
+				options.selector.Button:SetScript("OnClick", function(self, btn)
+					--ObjectiveTracker_ToggleDropDown(self, dropDownr)
+				end)
+				
+				options.selector.Text:SetJustifyH("Left")
+				options.selector.Text:SetPoint("Left", 9, 1)
+				
+				options.selector.Left:SetPoint("TopLeft", -17, 17)
+				options.selector.Middle:SetWidth(165)
+				
+				options.selector:SetScript("OnClick", options.selector.Button:GetScript("OnClick"))
+				
+				options.ScrollPanel = CreateFrame("ScrollFrame", options:GetName().."_ScrollPanel", options)
+				options.ScrollPanel:SetPoint("TopLeft", options.selector, "BottomLeft")
+				options.ScrollPanel:SetPoint("BottomRight", options, -10, 10)
+				options.child = CreateFrame("Frame", options:GetName().."_Container", options.ScrollPanel)
+				options.ScrollPanel:SetScrollChild(options.child)
+				options.child:SetPoint("TopLeft")
+				options.child:SetSize(180, 300)
+				
+				optionsParent = options.child
+				options.selector:EnableMouse(true)
+				
+				scrollPanel = options.ScrollPanel
+				scrollPanel.selector = options.selector
+				options.selector:SetScript("OnMouseWheel", function(self,delta)
+				
+				local _min = 0
+				local  _max = (#optionPanels - 1) * 190
+					local val = min(max(_min, options.ScrollPanel:GetHorizontalScroll() - (delta * 190)), _max)
+					local panel = floor(val/190) + 1
+					options.ScrollPanel.selector.Text:SetText(optionPanels[panel].name)
+					options.ScrollPanel:SetHorizontalScroll(val)
+				end)
+
+			return options
+		end,
+		scripts = {
+			OnMouseDown = function(self)
+				self:SetMovable(true)
+				self:StartMoving()
+			end,
+			OnMouseUp = function(self, button)
+				self:StopMovingOrSizing()
+			end,
+		},
+	})
+
+	Questra:AddElement({
+		name = "dragFrame",
+		parentElementName = 'frame',
+		Build = function(parentElement)
+			local dragFrame = CreateFrame("Button", AddonName.."_dragFrame", parentElement)
+				dragFrame:SetFrameStrata("MEDIUM")
+				dragFrame:SetFixedFrameStrata(true)
+				dragFrame:SetAllPoints(parentElement)
+				dragFrame:Hide()
+
+				dragFrame.texture = dragFrame:CreateTexture(nil, "OVERLAY")
+				dragFrame.texture:SetColorTexture(0, 1, 0, .45)
+				dragFrame.texture:SetAllPoints(dragFrame)
+				
+				parentElement.dragFrame = dragFrame
+				
+				
+			return dragFrame
+		end,
+		scripts = {
+			OnClick = function(self)
+				ToggleFrame(self:GetParent().options)
+			end,
+			OnMouseDown = function(self)
+				self:GetParent():SetMovable(true)
+				self:GetParent():StartMoving()
+			end,
+			OnMouseUp = function(self, button)
+				self:GetParent():StopMovingOrSizing()
+				Questra:Stick()
+			end,
+			OnLeave = function(self)
+				if self:IsVisible() and not MouseIsOver(self) then
+					self:Hide()
+				end
+			end,
+			OnShow = function() end,
+		},
+	})
+
 end
 
 Questra.Events  = {
@@ -1062,6 +1335,7 @@ Questra.Events  = {
 }
 
 local eventManager = {Forced = {}, }
+
 
 do --tracking management
 	do
@@ -1164,6 +1438,8 @@ do --tracking management
 		}
 
 		Questra.typesIndex = {}
+		
+		Questra.addedIndex = {}
 
 		Questra.tracking = {}
 
@@ -1198,9 +1474,34 @@ do --tracking management
 
 	local function AddTracking(infoTable)
 		tinsert(Questra.typesIndex, infoTable.trackingName)
+		tinsert(Questra.addedIndex, infoTable.trackingName)
 		tinsert(Questra.tracking, infoTable)
 		Questra.trackByName[infoTable.trackingName] = infoTable
 
+		if infoTable.options then
+			tinsert(infoTable.options, 1, {
+				kind = "CheckButton",
+				title = "Disable",
+				key = "disable",
+				default = false,
+				OnClick = function(self)
+					infoTable.sets.disable = not infoTable.sets.disable
+					self:SetChecked(infoTable.sets.disable)
+					
+					if infoTable.sets.disable == true then
+						infoTable.metricUpdate = nil
+						infoTable.lastMetric = nil
+					end
+					Questra.UpdateAutoTracking("FORCED")
+					Questra:UpdateTracking(0)
+					Questra.UpdateAutoTracking("FORCED")
+				end,
+				OnShow = function(self)
+					self:SetChecked(infoTable.sets.disable)
+				end,
+			})
+		
+		end
 
 		if infoTable.events then
 			for i, event in pairs(infoTable.events) do
@@ -1211,6 +1512,23 @@ do --tracking management
 		end
 
 		local _ = nil, (not tContains(eventManager.Forced, infoTable)) and tinsert(eventManager.Forced, infoTable)
+	end
+
+	function Questra:LoadTrackingOptions()
+	
+		for _, track in pairs(Questra.tracking) do
+		
+			Questra_DB.widgets[track.trackingName] = Questra_DB.widgets[track.trackingName] or {}
+		
+			track.sets = Questra_DB.widgets[track.trackingName]
+		
+			Questra:NewOptionPanel({
+				name = track.displayText,
+				options = track.options
+			})
+		
+		end
+	
 	end
 
 	function Questra:SaveAndRestoreTracking()
@@ -1264,6 +1582,10 @@ do --tracking management
 			...to be continued!
 		--]]
 
+		track.options =  {
+
+		}
+
 		track.GetLocation = function(questID)
 			return track.metrics[1]
 		end
@@ -1273,9 +1595,14 @@ do --tracking management
 		end
 
 		track.OnEvent = function()
+			-- if (not track.sets) or (track.sets.disable == true) then
+				-- return nil
+			-- end
+		
+		
 			if not track.metricUpdate then
 				track.metricUpdate = true
-				local id = Questra:GetPlayerMapID()
+				local id = digForWorldMapID(Questra:GetPlayerMapID())
 				local userPoint = C_DeathInfo.GetCorpseMapPosition(id)
 
 				if userPoint then
@@ -1323,16 +1650,22 @@ do --tracking management
 						GameTooltip:AddDoubleLine("Time since death:", string.format(SecondsToTime(diff, diff>60)))
 					end
 
+					local mapInfo = C_Map.GetMapInfo(tonumber(id))
 
-					local mapInfo = C_Map.GetMapInfo(id)
-
-
-
+					local _name = MapUtil.FindBestAreaNameAtMouse(tonumber(id), x, y)
 
 
-					local _ = mapInfo and GameTooltip:AddDoubleLine(mapInfo.name..":", (floor(x * 10000)/10000)*100 .. ", ".. (floor(y * 10000)/10000)  * 100, id ~= Questra:GetPlayerMapID() and unpack({1,0,0,1}), id ~= Questra:GetPlayerMapID()and unpack({1,0,0,1}))
-
-
+					if _name and _name ~= mapInfo.name then
+						_name = mapInfo.name..", ".._name..":"
+					else
+						_name = mapInfo.name..":"
+					end
+					
+					
+					local x = string.format("%.2f" , x*100)
+					local y = string.format("%.2f" , y*100)
+					
+					GameTooltip:AddDoubleLine(_name, x .. ", ".. y)
 
 					GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
 					GameTooltip:Show()
@@ -1341,16 +1674,25 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
-			local userPoint = track.GetLocation()
-			if userPoint then
-				local id, x, y = userPoint.mapID , userPoint.x, userPoint.y
+			if (not track.sets) or (track.sets.disable == true) then
+				return nil
+			end
+		
+			local id = digForWorldMapID(Questra:GetPlayerMapID())
+			local corpse = C_DeathInfo.GetCorpseMapPosition(id)
+			if corpse then
+				local id, x, y = id , corpse.x, corpse.y
 				if id and x and y then
 					return true
 				end
 			end
 		end
 
-		track.ShouldAutoSwap = function(newAutoSwap)
+		track.ShouldAutoSwap = function(newAutoSwap)		
+			-- if (not track.sets) or (track.sets.disable == true) then
+				-- return nil
+			-- end
+			
 			local id = digForWorldMapID(Questra:GetPlayerMapID())
 			local corpse = C_DeathInfo.GetCorpseMapPosition(id)
 
@@ -1358,9 +1700,7 @@ do --tracking management
 				local metric  = corpse.x .. corpse.y .. id
 				if metric and (metric ~= track.lastMetric) then
 					track.lastMetric = metric
-					if C_DeathInfo.GetCorpseMapPosition(id) then
-						return true
-					end
+					return true
 				end
 			end
 		end
@@ -1416,12 +1756,10 @@ do --tracking management
 	end
 
 	do local track = {trackingName = "quest",      displayText = "Quests",           color = {1, 0, 0}, metrics = {}, scrollValue = 1, allowPortals = true, allowFlights = true}
-		--[[constants: to be used by each tracking type, for consistency!
-			track.metrics --what to track ID or Table (prefer ID, less to track)
-			track.lastMetric
-			track.scrollValue
-			...to be continued!
-		--]]
+
+		track.options =  {
+
+		}
 
 		track.GetLocation = function(questID)
 			local questID = questID or track.metrics[track.GetScrollValue()]
@@ -1635,10 +1973,54 @@ do --tracking management
 
 				GameTooltip:SetText(info.title, info.difficultyColor.r, info.difficultyColor.g, info.difficultyColor.b)
 
+				if info.position.x and info.position.y then
 
-				local mapInfo = info.position.mapID and C_Map.GetMapInfo(info.position.mapID)
-				local _ = mapInfo and GameTooltip:AddLine(mapInfo.name, info.position.mapID ~= Questra:GetPlayerMapID()and unpack({1,0,0,1}))
+					local mapInfo = info.position.mapID and C_Map.GetMapInfo(info.position.mapID)
+					
+					local zone, zoneColorR, zoneColorG, zoneColorB = mapInfo and mapInfo.name, 1, 1, 1
+					
+					local _name = MapUtil.FindBestAreaNameAtMouse(tonumber(info.position.mapID), info.position.x, info.position.y)
+					if _name and _name ~= zone then
+						_name = zone..", ".._name
+					else
+						_name = zone
+					end
+				
+				
+				
+					local x = string.format("%.2f" , info.position.x*100)
+					local y = string.format("%.2f" , info.position.y*100)
 
+					GameTooltip:AddDoubleLine(_name..":", x..", "..y, zoneColorR, zoneColorG, zoneColorB)
+				else
+					GameTooltip:AddLine(_name, zoneColorR, zoneColorG, zoneColorB)
+
+				end
+				
+				local faction = info.factionName
+				
+				if faction then
+					local numFactions = GetNumFactions()
+					local factionIndex = 1
+					while (factionIndex <= numFactions) do
+						local name, description, standingId, bottomValue, topValue, earnedValue, atWarWith, canToggleAtWar,
+							isHeader, isCollapsed, hasRep, isWatched, isChild, factionID, hasBonusRepGain, canBeLFGBonus = GetFactionInfo(factionIndex)
+							
+						local label = standingId and _G["FACTION_STANDING_LABEL"..standingId]
+							
+						if isHeader and isCollapsed then
+							ExpandFactionHeader(factionIndex)
+							numFactions = GetNumFactions()
+						end
+						if (hasRep or not isHeader) and faction == name then
+							GameTooltip:AddDoubleLine(name..":",  label ..": " .. floor((earnedValue/topValue) * 100).."%")
+							break
+						end
+						factionIndex = factionIndex + 1
+					end
+				end
+				
+			
 				QuestUtils_AddQuestTypeToTooltip(GameTooltip, info.questID, NORMAL_FONT_COLOR)
 
 
@@ -1693,6 +2075,7 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then return end
 			return #track.metrics > 0 or nil
 		end
 
@@ -1949,6 +2332,12 @@ do --tracking management
 	end
 
 	do local track = {trackingName = "worldQuest", displayText = "World Quests",     color = {0, 0, 1}, metrics = {}, scrollValue = 1, allowPortals = true, allowFlights = true}
+		
+
+		track.options =  {
+
+		}
+		
 		track.GetLocation = function(questID)
 			local x, y, mapID = Questra:GetQuestLocation(questID)
 
@@ -2009,6 +2398,10 @@ do --tracking management
 				-- end
 			-- end
 		end
+		
+
+		local ignoredIDS = Questra.ignoredIDS
+		local ignoredTYPES = Questra.ignoredTYPES
 
 		track.OnEvent = function()
 			wipe(track.metrics)
@@ -2023,7 +2416,16 @@ do --tracking management
 					local questID = info.questID or info.questId
 					if QuestUtils_IsQuestWorldQuest(questID) and HaveQuestData(questID) then
 						--if C_TaskQuest.GetQuestZoneID(questID) == uiMapID then
-							if not tContains(track.metrics, questID) then
+						
+							
+							
+							local _info = C_QuestLog.GetQuestTagInfo(questID)
+							
+							local _type = _info and _info.worldQuestType
+
+							
+						
+							if not tContains(track.metrics, questID)  and (not ignoredIDS[questID]) and (not tContains(Questra.ignoredTYPES, _type)) then
 								tinsert(track.metrics, questID)
 							end
 						--end
@@ -2058,6 +2460,7 @@ do --tracking management
 		end
 
 		track.SetToMetric = function(id)
+		
 			for i, b in pairs(track.metrics) do
 				if b == id then
 					track.scrollValue = i
@@ -2065,7 +2468,43 @@ do --tracking management
 			end
 
 		end
+			
+		local function AddQuestTagTooltipLine(tooltip, tagID, worldQuestType, lineText, iconWidth, iconHeight, color)
+			local tooltipLine
+			
+			local texCoords = QuestUtils_GetQuestTagTextureCoords(tagID, worldQuestType);
 
+			if texCoords then
+				-- Use reasonable defaults if nothing is specified
+				iconWidth = iconWidth or 20;
+				iconHeight = iconHeight or 20;
+
+				local textureMarkup = CreateTextureMarkup(QUEST_ICONS_FILE, QUEST_ICONS_FILE_WIDTH, QUEST_ICONS_FILE_HEIGHT, iconWidth, iconHeight, unpack(texCoords))
+				tooltipLine = string.format("%s %s", textureMarkup, lineText); -- Convert to localized string to handle dynamic icon placement?
+			end
+			
+			
+			
+			
+			if tooltipLine then
+				tooltip:AddLine(tooltipLine, color:GetRGB())
+			else
+				
+				local lineText = Questra.questTypes[worldQuestType]
+				
+				
+						
+				if lineText then
+					tooltip:AddLine(lineText, color:GetRGB())
+				end
+				
+				
+				
+			
+			
+			end
+		end
+			
 		track.SetTooltip = function()
 			local info = track.GetMetricInfo()
 			if info then
@@ -2077,7 +2516,13 @@ do --tracking management
 				if not info.title then return end
 
 				GameTooltip:SetText(info.title, color.r, color.g, color.b)
-				QuestUtils_AddQuestTypeToTooltip(GameTooltip, info.questID, NORMAL_FONT_COLOR)
+
+
+				local _info = C_QuestLog.GetQuestTagInfo(info.questID)
+
+
+				AddQuestTagTooltipLine(GameTooltip, _info.tagID, _info.worldQuestType, _info.tagName, _, _, NORMAL_FONT_COLOR)
+
 
 				local mapInfo = C_Map.GetMapInfo(info.position.mapID)
 				local zone, zoneColorR, zoneColorG, zoneColorB = mapInfo.name, 1, 1, 1
@@ -2086,14 +2531,47 @@ do --tracking management
 					zoneColorR, zoneColorG, zoneColorB = 1,0,0
 				end
 				
-				local faction = info.factionName
+				local _name = MapUtil.FindBestAreaNameAtMouse(tonumber(info.position.mapID), info.position.x, info.position.y)
+				if _name and _name ~= zone then
+					_name = zone..", ".._name
+				else
+					_name = zone
+				end
 
-				if zone and faction then
-					GameTooltip:AddDoubleLine(zone, faction, zoneColorR, zoneColorG, zoneColorB)
-				elseif zone or faction then
-					GameTooltip:AddLine(zone or faction, zoneColorR, zoneColorG, zoneColorB)
+				if info.position.x and info.position.y then
+				local x = string.format("%.2f" , info.position.x*100)
+				local y = string.format("%.2f" , info.position.y*100)
+
+					GameTooltip:AddDoubleLine(_name..":", x..", "..y, zoneColorR, zoneColorG, zoneColorB)
+				else
+					GameTooltip:AddLine(_name, zoneColorR, zoneColorG, zoneColorB)
+
 				end
 				
+				local faction = info.factionName
+				
+				if faction then
+					local numFactions = GetNumFactions()
+					local factionIndex = 1
+					while (factionIndex <= numFactions) do
+						local name, description, standingId, bottomValue, topValue, earnedValue, atWarWith, canToggleAtWar,
+							isHeader, isCollapsed, hasRep, isWatched, isChild, factionID, hasBonusRepGain, canBeLFGBonus = GetFactionInfo(factionIndex)
+							
+						local label = standingId and _G["FACTION_STANDING_LABEL"..standingId]
+							
+						if isHeader and isCollapsed then
+							ExpandFactionHeader(factionIndex)
+							numFactions = GetNumFactions()
+						end
+						if (hasRep or not isHeader) and faction == name then
+							GameTooltip:AddDoubleLine(name..":",  label ..": " .. floor((earnedValue/topValue) * 100).."%")
+							break
+						end
+						factionIndex = factionIndex + 1
+					end
+				end
+				
+
 				local pMap = Questra.professionsMap[info.tagInfo and (info.tagInfo.tradeskillLineID or info.tagInfo.professionIndex)]
 				if pMap then
 					GameTooltip:AddLine(pMap, 1, 1, 1)
@@ -2123,6 +2601,7 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then return end
 			return #track.metrics > 0 or nil
 		end
 
@@ -2219,6 +2698,44 @@ do --tracking management
 			info.checked = false;
 			info.noClickSound = 1;
 			UIDropDownMenu_AddButton(info, UIDROPDOWN_MENU_LEVEL);
+			
+			info.text = "Ignore Quest"
+			info.func = function()
+				ignoredIDS[questID] = true
+					Questra:UpdateDisplayed("Forced")
+					if #track.metrics == 0 then
+						Questra:SetTracking()
+					end
+					Questra:CollectUpdate()
+					Questra:Update()
+			end;
+			info.arg1 = questID;
+			info.checked = false;
+			UIDropDownMenu_AddButton(info, UIDROPDOWN_MENU_LEVEL);
+			
+			info.text = "Ignore Quest Type"
+			info.func = function()
+			
+				local _info = C_QuestLog.GetQuestTagInfo(questID)
+			
+			
+				Questra.ignoredIDS[questID] = true
+			
+				tinsert(Questra.ignoredTYPES, _info.worldQuestType)
+			
+					Questra:UpdateDisplayed("Forced")
+					if #track.metrics == 0 then
+						Questra:SetTracking()
+					end
+					Questra:CollectUpdate()
+					Questra:Update()
+			end;
+			info.arg1 = questID;
+			info.checked = false;
+			UIDropDownMenu_AddButton(info, UIDROPDOWN_MENU_LEVEL);
+
+
+			
 		end
 
 		track.OnClick = function(btn)
@@ -2264,6 +2781,11 @@ do --tracking management
 	end
 
 	do local track = {trackingName = "way",        displayText = "Waypoints",        color = {0, 1, 0}, metrics = {}, referenceDetails = {}, scrollValue = 1, save = true, allowPortals = true, allowFlights = true}
+		
+		track.options =  {
+
+		}
+		
 		track.GetLocation = function()
 			return track.metrics[track.GetScrollValue()]
 		end
@@ -2324,7 +2846,16 @@ do --tracking management
 
 					local mapInfo = C_Map.GetMapInfo(tonumber(id))
 
-					GameTooltip:AddDoubleLine(mapInfo.name..":", x*100 .. ", ".. y  * 100)
+					local _name = MapUtil.FindBestAreaNameAtMouse(tonumber(id), x, y)
+
+
+					if _name and _name ~= mapInfo.name then
+						_name = mapInfo.name..", ".._name..":"
+					else
+						_name = mapInfo.name..":"
+					end
+					
+					GameTooltip:AddDoubleLine(_name, x*100 .. ", ".. y  * 100)
 
 					GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
 					GameTooltip:Show()
@@ -2333,6 +2864,9 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then
+				return
+			end
 			return #track.metrics > 0 or nil
 		end
 
@@ -2510,6 +3044,12 @@ do --tracking management
 
 	do local track = {trackingName = "flight",     displayText = "Flight Masters",   color = {1, 1, 0}, metrics = {}, referenceDetails = {}, scrollValue = 1, save = true, allowPortals = true, allowFlights = true}
 
+
+		track.options =  {
+
+		}
+
+
 		track.GetLocation = function()
 			return track.metrics[track.GetScrollValue()]
 		end
@@ -2550,8 +3090,6 @@ do --tracking management
 					end
 
 
-					local mapInfo = C_Map.GetMapInfo(tonumber(id))
-
 					if userPoint.title then
 						GameTooltip:AddDoubleLine(userPoint.title)
 					end
@@ -2561,7 +3099,18 @@ do --tracking management
 							GameTooltip:AddDoubleLine("Time since selection:", string.format(SecondsToTime(diff, diff>60)))
 					end
 
-					GameTooltip:AddDoubleLine(mapInfo.name..":", x*100 .. ", ".. y  * 100)
+					local mapInfo = C_Map.GetMapInfo(tonumber(id))
+
+					local _name = MapUtil.FindBestAreaNameAtMouse(tonumber(id), x, y)
+
+
+					if _name and _name ~= mapInfo.name then
+						_name = mapInfo.name..", ".._name..":"
+					else
+						_name = mapInfo.name..":"
+					end
+					
+					GameTooltip:AddDoubleLine(_name, x*100 .. ", ".. y  * 100)
 
 					GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
 					GameTooltip:Show()
@@ -2570,6 +3119,7 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then return end
 			return #track.metrics > 0 or nil
 		end
 
@@ -2653,6 +3203,12 @@ do --tracking management
 
 	do local track = {trackingName = "offer",      displayText = "Available Quests", color = {0, 1, 1}, metrics = {}, referenceDetails = {}, scrollValue = 1, save = true, allowPortals = true, allowFlights = true}
 
+
+		track.options =  {
+
+		}
+
+
 		track.GetLocation = function()
 			return track.metrics[track.GetScrollValue()]
 		end
@@ -2701,6 +3257,17 @@ do --tracking management
 
 					local mapInfo = C_Map.GetMapInfo(tonumber(id))
 
+					local _name = MapUtil.FindBestAreaNameAtMouse(tonumber(id), x, y)
+
+
+					if _name and _name ~= mapInfo.name then
+						_name = mapInfo.name..", ".._name..":"
+					else
+						_name = mapInfo.name..":"
+					end
+					
+					GameTooltip:AddDoubleLine(_name, x*100 .. ", ".. y  * 100)
+
 					GameTooltip:AddDoubleLine(mapInfo.name..":", x*100 .. ", ".. y  * 100)
 
 					GameTooltip_CalculatePadding(GameTooltip) --must be called to resize tooltip while scrolling.
@@ -2710,6 +3277,7 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then return end
 			return #track.metrics > 0 or nil
 		end
 
@@ -2904,6 +3472,12 @@ do --tracking management
 	end
 
 	do local track = {trackingName = "other",      displayText = "Map Pins",         color = {1, 0, 1}, metrics = {}, referenceDetails = {}, scrollValue = 1, save = true, allowPortals = true, allowFlights = true}
+		
+
+		track.options =  {
+
+		}
+		
 		track.GetLocation = function()
 			return track.metrics[track.GetScrollValue()]
 		end
@@ -3007,6 +3581,7 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then return end
 			return #track.metrics > 0 or nil
 		end
 
@@ -3310,6 +3885,12 @@ do --tracking management
 	end
 
 	do local track = {trackingName = "achievement",displayText = "Achievements",     color = {1, 1, 1}, metrics = {}, referenceDetails = {}, scrollValue = 1, allowPortals = true, allowFlights = true}
+	
+
+		track.options =  {
+
+		}
+
 		track.GetLocation = function(questID)
 			-- local questID = questID or track.metrics[track.GetScrollValue()]
 
@@ -3512,10 +4093,12 @@ do --tracking management
 		end
 
 		track.ShouldShow = function()
+			if (not track.sets) or (track.sets.disable == true) then return end
 			return #track.metrics > 0 or nil
 		end
 
 		track.ShouldAutoSwap = function(newAutoSwap)
+			return nil
 			-- if (not newAutoSwap) then
 				-- local metric  = C_SuperTrack.GetSuperTrackedQuestID()
 				-- if metric and (metric ~= track.lastMetric) then
@@ -3748,7 +4331,8 @@ do--texture Consolidation
 		LeftArrowPushed = texturePath.."LeftArrow-Pushed",
 		LeftArrow = texturePath.."LeftArrow",
 		
-		metricIndicator = texturePath.."MetricIndicator",
+		metricDial = texturePath.."MetricIndicator",
+		MetricFlash = texturePath.."MetricFlash",
 		
 		pupil = texturePath.."Eye\\pupil",
 		swirl = texturePath.."Eye\\pupilSwirl",
@@ -3774,4 +4358,268 @@ do--texture Consolidation
 		lower8 =   texturePath.."Eye\\eyelids\\lower8",
 		lower9 =   texturePath.."Eye\\eyelids\\lower9",
 	}
+end
+
+
+do --settings functions
+	function Questra:EnableFlyPaper()
+		FlyPaper.AddFrame(AddonName, "questraFrame", Questra.frame)
+	end
+	
+
+	--------------------------------------------------------------------------------
+	-- Positioning: Borrowed from Dominos
+	-- ToDo: Ask Tuller for permission...
+	--------------------------------------------------------------------------------
+
+	function Questra:SavePosition(point, relPoint, x, y)
+		if point == nil then
+			error('Usage: Frame:SavePosition(point, [relPoint, x, y]', 2)
+		end
+
+		if relPoint == point then
+			relPoint = nil
+		end
+
+		if point == 'CENTER' then
+			point = nil
+		end
+
+		x = tonumber(x) or 0
+		if x == 0 then
+			x = nil
+		end
+
+		y = tonumber(y) or 0
+		if y == 0 then
+			y = nil
+		end
+
+		local sets = Questra.sets
+		sets.point = point
+		sets.relPoint = relPoint
+		sets.x = x
+		sets.y = y
+	end
+
+	function Questra:GetSavedPosition()
+		local sets = Questra.sets
+		local point = sets.point or 'CENTER'
+		local relPoint = sets.relPoint or point
+		local x = sets.x or 0
+		local y = sets.y or 0
+
+		return point, relPoint,x, y
+	end
+
+	function Questra:SaveRelativePostiion()
+		local point, relPoint, x, y = Questra:GetRelativePosition()
+
+		Questra:SavePosition(point, relPoint, x, y)
+	end
+
+	function Questra:GetRelativePosition()
+		local point, relPoint, x, y = FlyPaper.GetBestAnchorForParent(Questra.frame)
+		return point, relPoint, x, y
+	end
+
+	function Questra:RestorePosition()
+		local point, relPoint, x, y = Questra:GetSavedPosition()
+		local scale = Questra:GetFrameScale()
+
+		Questra.frame:ClearAllPoints()
+		Questra.frame:SetScale(scale)
+		Questra.frame:SetPoint(point, Questra.frame:GetParent() or _G.UIParent, relPoint, x, y)
+		return true
+	end
+
+	function Questra:GetFrameScale()
+		return Questra.sets.scale or 1
+	end
+
+
+	--------------------------------------------------------------------------------
+	-- Anchoring
+	--------------------------------------------------------------------------------
+
+	function Questra:SaveAnchor(relFrame, point, relPoint, x, y)
+		if relFrame == nil or point == nil then
+			error('Usage: Frame:SaveAnchor(relFrame, point, [relPoint, x, y]', 2)
+		end
+
+		if relFrame == self then
+			error('Cannot anchor to self', 2)
+		end
+
+		local relFrameGroup, relFrameId = FlyPaper.GetFrameInfo(relFrame)
+		if relFrame == nil then
+			error('Frame is not registered with FlyPaper', 2)
+		end
+
+		local anchor = self.sets.anchor
+		if not anchor or type(anchor) == "string" then
+			anchor = {}
+			self.sets.anchor = anchor
+		end
+
+		-- purge defaults
+		if relFrameGroup == AddonName then
+			relFrameGroup = nil
+		end
+
+		if relPoint == point then
+			relPoint = nil
+		end
+
+		x = tonumber(x) or 0
+		if x == 0 then
+			x = nil
+		end
+
+		y = tonumber(y) or 0
+		if y == 0 then
+			y = nil
+		end
+
+		anchor.point = point
+		anchor.relFrame = relFrameId
+		anchor.relFrameGroup = relFrameGroup
+		anchor.relPoint = relPoint
+		anchor.x = x
+		anchor.y = y
+
+		if not next(anchor) then
+			self.sets.anchor = nil
+		end
+	end
+
+	function Questra:GetSavedAnchor()
+		local anchor = Questra.sets and Questra.sets.anchor
+		if type(anchor) == 'table' then
+			local point = anchor.point
+			local relFrameId = anchor.relFrame
+			local relFrameGroup = anchor.relFrameGroup or AddonName
+			local relFrame = FlyPaper.GetFrame(relFrameGroup, relFrameId)
+			local relPoint = anchor.relPoint or point
+			local x = anchor.x or 0
+			local y = anchor.y or 0
+
+			return relFrame, point, relPoint, x, y
+		end
+	end
+
+	function Questra:ClearSavedAnchor()
+		Questra.sets.anchor = nil
+	end
+
+	function Questra:RestoreAnchor()
+		local relFrame, point, relPoint, x, y = Questra:GetSavedAnchor()
+		local scale = Questra:GetFrameScale() or 1
+
+		if relFrame then
+			Questra.frame:ClearAllPoints()
+			Questra.frame:SetScale(scale)
+			Questra.frame:SetPoint(point, relFrame, relPoint, x, y)
+			return true
+		end
+	end
+
+	function Questra:IsAnchored()
+		if self:GetSavedAnchor() then
+			return true
+		end
+		return false
+	end
+
+	function Questra:IsAnchoredToFrame(frame)
+		if frame == nil or frame == Questra.frame then
+			return false
+		end
+
+		for i = 1, Questra.frame:GetNumPoints() do
+			local _, relFrame = Questra.frame:GetPoint(i)
+			if frame == relFrame then
+				return true
+			end
+		end
+
+		return false
+	end
+
+
+
+	--------------------------------------------------------------------------------
+	-- Sticking/Snapping
+	--------------------------------------------------------------------------------
+
+	-- how far away a frame can be from another frame/edge to trigger anchoring
+	Questra.stickyTolerance = 8
+
+	function Questra:Stick()
+		-- only do sticky code if the alt key is not currently down
+		--if Questra:Sticky() and not IsModifiedClick("DOMINOS_IGNORE_STICKY_FRAMES") then
+			if Questra:StickToFrame() or Questra:StickToGrid() or Questra:StickToEdge() then
+				Questra:SaveRelativePostiion()
+				return true
+			end
+		--end
+
+		Questra:ClearSavedAnchor()
+		Questra:SaveRelativePostiion()
+		return false
+	end
+
+	-- bar anchoring
+	function Questra:StickToFrame()
+		local point, relFrame, relPoint = FlyPaper.GetBestAnchor(Questra.frame, Questra.stickyTolerance)
+
+		if point then
+			Questra.frame:ClearAllPoints()
+			Questra.frame:SetPoint(point, relFrame, relPoint)
+			Questra:SaveAnchor(relFrame, point, relPoint)
+			Questra:SaveRelativePostiion()
+
+			return true
+		end
+
+		Questra:ClearSavedAnchor()
+		return false
+	end
+
+	-- grid anchoring
+	function Questra:StickToGrid()
+		return false
+	end
+
+	-- screen edge and center point anchoring
+	function Questra:StickToEdge()
+		local point, relPoint, x, y = FlyPaper.GetBestAnchorForParent(Questra.frame)
+		local scale = Questra.frame:GetScale()
+
+		if point then
+			local stick = false
+
+			if math.abs(x * scale) <= Questra.stickyTolerance then
+				x = 0
+				stick = true
+			end
+
+			if math.abs(y * scale) <= Questra.stickyTolerance then
+				y = 0
+				stick = true
+			end
+
+			if stick then
+				Questra.frame:ClearAllPoints()
+				Questra.frame:SetPoint(point, Questra.frame:GetParent(), relPoint, x, y)
+
+				Questra:SaveRelativePostiion()
+				return true
+			end
+		end
+
+		return false
+	end
+
+
 end

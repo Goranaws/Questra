@@ -25,7 +25,6 @@ local op = {
 }
 
 
-
 local function QuickJoinToastMixin_OnEnter(button, questID, queued)
 	if not questID then
 		return --print(button, questID)
@@ -81,7 +80,6 @@ local function GetInstanceIDByName(zoneID, name)
 		end
 	end
 end
-
 
 --let's make the LFG eye look around and blink at random!
 local actionStep = 8
@@ -652,61 +650,6 @@ local function GetAnchorsNearestScreenCenter(self)
 end
 Questra.GetAnchorsNearestScreenCenter = GetAnchorsNearestScreenCenter
 
-function Questra:ShowGroupButton(questID)
-	local showGroup, shouldAnimate, isQueued = shouldShowAndOrAnimate()
-
-	canCreateGroup[questID or 0] = questID and canCreateGroup[questID] or questID and CanCreateQuestGroup(questID) or false
-	local state = UnitInAnyGroup("player") == true and true or showGroup or canCreateGroup[questID]
-	
-	local alwaysShow = true--self:GetSets().display.showGroup == true
-	
-	local groupButton = (alwaysShow or state) and Questra.groupButton
-	
-	groupButton.isQueued = isQueued
-			
-	if groupButton then
-		if isQueued then
-			EyeTemplate_StartSpin(groupButton)
-		elseif shouldAnimate and (alwaysShow or state) then
-			EyeTemplate_StartAnimating(groupButton)
-
-		else
-			EyeTemplate_StopAnimating(groupButton)
-		end
-		groupButton.glowLocks = QueueStatusMinimapButton.glowLocks
-		QueueStatusMinimapButton_UpdateGlow(groupButton)
-	end
-	
-	local textureInfo = LFG_EYE_TEXTURES["default"]
-	if groupButton and not InCombatLockdown() then
-		groupButton.questID = questID
-		local shouldShow = ((state == true) or (UnitInAnyGroup("player") == true) or (showGroup)) and true or nil
-		groupButton.tooltip, groupButton.tooltip2  = (((state == true) and (not inGroup)) and (showGroup)) and "You are looking for a group." --and you need to be in a group for this quest.
-		or ((state == true) and (not inGroup))and "This task suggests a group." --and you aren't in one yet.
-		or ((UnitInAnyGroup("player") == true)) and "You are in a group, but this task does not require one" --some quests won't provide credit if you are in the wrong type of group...
-		or (alwaysShow == true) and "Right click for Dungeon Finder.",
-		(((state == true) and (not inGroup)) and (showGroup)) and "Be patient..."
-		or ((state == true) and (not inGroup)) and "Left click to find one."
-		or (UnitInAnyGroup("player") == true) and "Right click to leave the group."
-		or (alwaysShow == true) --and "Right click for Dungeon Finder."
-		
-		groupButton.Normal:SetVertexColor(unpack(((state == true) and (not inGroup)) and on or off))
-		--groupButton:GetPushedTexture():SetVertexColor(unpack(((state == true) and (not inGroup)) and on or off))
-		local showGroup = shouldShowAndOrAnimate()
-		shouldShow = shouldShow or showGroup or alwaysShow
-
-		local d = (((UnitInAnyGroup("player") == true) or shouldShow) and not groupButton:IsShown()) and groupButton:Show() or (groupButton:IsShown() and not shouldShow) and groupButton:Hide() --why not?
-	
-	
-		if groupButton:IsShown() then
-			QueueStatusMinimapButton:Hide()
-		end
-	
-		return d
-	end
-end
-
-
 Questra:AddElement({
 	name = "groupButton",
 	parentElementName = "frame",
@@ -726,7 +669,57 @@ Questra:AddElement({
 		return button
 	end,
 	OnQuestUpdate = function(self, questID)
-		Questra:ShowGroupButton(questID)
+		local showGroup, shouldAnimate, isQueued = shouldShowAndOrAnimate()
+
+		canCreateGroup[questID or 0] = questID and canCreateGroup[questID] or questID and CanCreateQuestGroup(questID) or false
+		local state = UnitInAnyGroup("player") == true and true or showGroup or canCreateGroup[questID]
+		
+		local alwaysShow = true--self:GetSets().display.showGroup == true
+		
+		local groupButton = (alwaysShow or state) and Questra.groupButton
+		
+		groupButton.isQueued = isQueued
+				
+		if groupButton then
+			if isQueued then
+				EyeTemplate_StartSpin(groupButton)
+			elseif shouldAnimate and (alwaysShow or state) then
+				EyeTemplate_StartAnimating(groupButton)
+
+			else
+				EyeTemplate_StopAnimating(groupButton)
+			end
+			groupButton.glowLocks = QueueStatusMinimapButton.glowLocks
+			QueueStatusMinimapButton_UpdateGlow(groupButton)
+		end
+		
+		local textureInfo = LFG_EYE_TEXTURES["default"]
+		if groupButton and not InCombatLockdown() then
+			groupButton.questID = questID
+			local shouldShow = ((state == true) or (UnitInAnyGroup("player") == true) or (showGroup)) and true or nil
+			groupButton.tooltip, groupButton.tooltip2  = (((state == true) and (not inGroup)) and (showGroup)) and "You are looking for a group." --and you need to be in a group for this quest.
+			or ((state == true) and (not inGroup))and "This task suggests a group." --and you aren't in one yet.
+			or ((UnitInAnyGroup("player") == true)) and "You are in a group, but this task does not require one" --some quests won't provide credit if you are in the wrong type of group...
+			or (alwaysShow == true) and "Right click for Dungeon Finder.",
+			(((state == true) and (not inGroup)) and (showGroup)) and "Be patient..."
+			or ((state == true) and (not inGroup)) and "Left click to find one."
+			or (UnitInAnyGroup("player") == true) and "Right click to leave the group."
+			or (alwaysShow == true) --and "Right click for Dungeon Finder."
+			
+			groupButton.Normal:SetVertexColor(unpack(((state == true) and (not inGroup)) and on or off))
+			--groupButton:GetPushedTexture():SetVertexColor(unpack(((state == true) and (not inGroup)) and on or off))
+			local showGroup = shouldShowAndOrAnimate()
+			shouldShow = shouldShow or showGroup or alwaysShow
+
+			local d = (((UnitInAnyGroup("player") == true) or shouldShow) and not groupButton:IsShown()) and groupButton:Show() or (groupButton:IsShown() and not shouldShow) and groupButton:Hide() --why not?
+		
+		
+			if groupButton:IsShown() then
+			--	QueueStatusMinimapButton:Hide()
+			end
+		
+			return d
+		end
 	end,
 	scripts = {
 		OnClick = function(self, btn, ...)
@@ -861,8 +854,8 @@ Questra:AddElement({
 			end
 		end,
 		OnMouseDown = function(self)
-			self:SetSize(40, 30)
-			self:SetPoint("Left", self:GetParent(), "Left", -9.5, -27)
+			self:SetSize(30, 40)
+			self:SetPoint("Left", self:GetParent(), "Left", -3, -24)
 		end,
 		OnMouseUp = function(self)
 			self:SetSize(35, 35)

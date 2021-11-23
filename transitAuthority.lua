@@ -1396,34 +1396,50 @@ do --flight recommendations
 end
 
 
-do --combine portal and flight point recommendations to offer transit itineraries
+do --to do: combine portal and flight point recommendations to offer transit itineraries
 	function Questra:GetAlternateWaypoints(dX, dY, dID)
+		local _dX, _dY, _dID = dX, dY, dID
 		local portalAvailable
-			if Questra:GetTracked() and Questra:GetTracked().allowPortals == true then
-				portalAvailable = dID and Questra:GetPortal(dID)
-				if portalAvailable then
-					Questra.portalSense = portalAvailable
-					dX = portalAvailable.origin.x
-					dY = portalAvailable.origin.y
-					dID = portalAvailable.origin.mapID
-				end
+		if Questra:GetTracked() and Questra:GetTracked().allowPortals == true then
+			portalAvailable = _dID and Questra:GetPortal(_dID)
+			if portalAvailable then
+				_dX = portalAvailable.origin.x
+				_dY = portalAvailable.origin.y
+				_dID = portalAvailable.origin.mapID
 			end
+		end
 
-			local flightAvailable
-			if Questra:GetTracked() and Questra:GetTracked().allowFlights == true then
-				flightAvailable = Questra:GetFlight(dID, dX, dY) --not completely ready: sometimes inaccurate
-				if flightAvailable then
-					Questra.portalSense = flightAvailable
-					dX = flightAvailable.origin.x
-					dY = flightAvailable.origin.y
-					dID = flightAvailable.origin.mapID
-				elseif not portalAvailable then
-					Questra.portalSense = nil
-				end
+		local flightAvailable
+		if Questra:GetTracked() and Questra:GetTracked().allowFlights == true then
+			flightAvailable = Questra:GetFlight(_dID, _dX, _dY) --not completely ready: sometimes inaccurate
+			if flightAvailable then
+				_dX = flightAvailable.origin.x
+				_dY = flightAvailable.origin.y
+				_dID = flightAvailable.origin.mapID
+			elseif not portalAvailable then
 			end
-	
+		end
+
+		if (dX ~= _dX or dY ~= _dY or dID ~= _dID) then
+			if not Questra.portalSense then
+				Questra.possibleWaypont = flightAvailable or portalAvailable
+				Questra.TrackerScrollButton.AltRouteFlasher.flashAnimation:Play()
+				Questra.TrackerScrollButton.AltRouteFlasher:Show()
+				Questra.TrackerScrollButton.AltRouteFlasher.flash:Show()
+			else
+				Questra.possibleWaypont= nil
+				Questra.TrackerScrollButton.AltRouteFlasher.flashAnimation:Stop()
+				Questra.TrackerScrollButton.AltRouteFlasher:Hide()
+				Questra.TrackerScrollButton.AltRouteFlasher.flash:Hide()
+				return _dX, _dY, _dID
+			end
+		else
+			Questra.possibleWaypont= nil
+			Questra.portalSense = nil
+			Questra.TrackerScrollButton.AltRouteFlasher.flashAnimation:Stop()
+			Questra.TrackerScrollButton.AltRouteFlasher:Hide()
+			Questra.TrackerScrollButton.AltRouteFlasher.flash:Hide()
+		end
 		return dX, dY, dID
 	end
-
-
 end
