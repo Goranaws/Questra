@@ -30,8 +30,7 @@ function pingAnywhere.chat(x, y, mapID, questID)
 				or C_QuestLog.GetTitleForQuestID(questID))
 		local questText = (questLink) and questLink or ""
 		
-		local at = (mapLink ~= "") and " @ " or ""
-		
+		local at = (gsub(questText," ","") ~= "") and " @ " or ""
 		
 		mapLink = mapLink or ""
 		activeLinkWindow:SetText(questText .. at ..mapLink)

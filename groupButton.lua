@@ -650,11 +650,13 @@ local function GetAnchorsNearestScreenCenter(self)
 end
 Questra.GetAnchorsNearestScreenCenter = GetAnchorsNearestScreenCenter
 
-Questra:AddElement({
+
+local GFB = {
 	name = "groupButton",
+	displayName = "Group Finder",
 	parentElementName = "frame",
 	Build = function(parentElement, ...)
-		local button = CreateFrame("Button", "Questra-GroupFinder", parentElement, "Q_C_GroupFinderButton")
+		local button = CreateFrame("Button", "Questra-GroupFinder", parentElement, "Questra_GroupFinderButton")
 		button:ClearAllPoints()
 		button:SetFrameStrata("BACKGROUND")
 		button:SetPoint("Left", parentElement, "Left", -7, -25)
@@ -665,22 +667,38 @@ Questra:AddElement({
 		button.pupil:SetTexture(Questra.textures.pupil)
 		button.shine:SetTexture("Interface\\AddOns\\"..AddonName.."\\artwork\\".."Eye\\shine")
 
+		button.yAnchor = -25
+		button.xAnchor = -7
+
 		button:RegisterForClicks("AnyUp")
+	
 		return button
 	end,
-	OnQuestUpdate = function(self, questID)
+}
+	GFB.OnQuestUpdate = function(_, questID)
 		local showGroup, shouldAnimate, isQueued = shouldShowAndOrAnimate()
 
 		canCreateGroup[questID or 0] = questID and canCreateGroup[questID] or questID and CanCreateQuestGroup(questID) or false
 		local state = UnitInAnyGroup("player") == true and true or showGroup or canCreateGroup[questID]
 		
-		local alwaysShow = true--self:GetSets().display.showGroup == true
+		local alwaysShow = GFB.sets.alwaysShow == true
 		
-		local groupButton = (alwaysShow or state) and Questra.groupButton
+		local groupButton = Questra.groupButton
 		
-		groupButton.isQueued = isQueued
-				
+		if GFB.sets.alwaysShow == true then
+			groupButton = Questra.groupButton
+		
+		elseif not state then
+			if groupButton and groupButton:IsShown() then
+				groupButton:Hide()
+			end
+			groupButton = nil
+			return
+		end
+		
+		
 		if groupButton then
+			groupButton.isQueued = isQueued
 			if isQueued then
 				EyeTemplate_StartSpin(groupButton)
 			elseif shouldAnimate and (alwaysShow or state) then
@@ -696,6 +714,7 @@ Questra:AddElement({
 		local textureInfo = LFG_EYE_TEXTURES["default"]
 		if groupButton and not InCombatLockdown() then
 			groupButton.questID = questID
+			GFB.questID = questID
 			local shouldShow = ((state == true) or (UnitInAnyGroup("player") == true) or (showGroup)) and true or nil
 			groupButton.tooltip, groupButton.tooltip2  = (((state == true) and (not inGroup)) and (showGroup)) and "You are looking for a group." --and you need to be in a group for this quest.
 			or ((state == true) and (not inGroup))and "This task suggests a group." --and you aren't in one yet.
@@ -714,14 +733,28 @@ Questra:AddElement({
 			local d = (((UnitInAnyGroup("player") == true) or shouldShow) and not groupButton:IsShown()) and groupButton:Show() or (groupButton:IsShown() and not shouldShow) and groupButton:Hide() --why not?
 		
 		
-			if groupButton:IsShown() then
-			--	QueueStatusMinimapButton:Hide()
+			if groupButton:IsShown() and GFB.sets.hideDefault == true then
+				QueueStatusMinimapButton:Hide()
 			end
 		
 			return d
 		end
-	end,
-	scripts = {
+	end
+	
+	
+	GFB.Layout = function(self, sets)
+		self:ClearAllPoints()
+		if sets.flip == true then
+			self:SetPoint("Left", self:GetParent(), "Left", -7, 22)
+			self.yAnchor = 22
+			self.ybump = -1
+		else
+			self:SetPoint("Left", self:GetParent(), "Left", -7, -25)
+			self.yAnchor = -25
+			self.ybump = 1
+		end
+	end
+	GFB.scripts = {
 		OnClick = function(self, btn, ...)
 			self.DropDown = self.DropDown or QueueStatusMinimapButton.DropDown
 			if (not InCombatLockdown()) then
@@ -855,11 +888,11 @@ Questra:AddElement({
 		end,
 		OnMouseDown = function(self)
 			self:SetSize(30, 40)
-			self:SetPoint("Left", self:GetParent(), "Left", -3, -24)
+			self:SetPoint("Left", self:GetParent(), "Left", -3, self.yAnchor + self.ybump)
 		end,
 		OnMouseUp = function(self)
 			self:SetSize(35, 35)
-			self:SetPoint("Left", self:GetParent(), "Left", -7, -25)
+			self:SetPoint("Left", self:GetParent(), "Left", -7, self.yAnchor)
 		end,
 		OnEnter = function(self)
 			local show, animate = shouldShowAndOrAnimate()
@@ -869,5 +902,42 @@ Questra:AddElement({
 			GameTooltip:Hide()
 			QueueStatusFrame:Hide()
 		end,
-	},
-})	
+	}
+
+
+GFB.options = {
+		{
+			kind = "CheckButton",
+			title = "Always Show",
+			key = "alwaysShow",
+			default = false,
+			OnClick = function(self)
+				GFB.sets.alwaysShow = not GFB.sets.alwaysShow
+				self:SetChecked(GFB.sets.alwaysShow)
+				
+				GFB.OnQuestUpdate(nil, GFB.questID)	
+			end,
+			OnShow = function(self)
+				self:SetChecked(GFB.sets.alwaysShow)
+			end,
+		},
+		{
+			kind = "CheckButton",
+			title = "Hide Default Group Button",
+			key = "hideDefault",
+			default = false,
+			OnClick = function(self)
+				GFB.sets.hideDefault = not GFB.sets.hideDefault
+				self:SetChecked(GFB.sets.hideDefault)
+				
+				GFB.OnQuestUpdate(nil, GFB.questID)	
+			end,
+			OnShow = function(self)
+				self:SetChecked(GFB.sets.hideDefault)
+			end,
+		},
+	}
+	
+
+
+Questra:AddElement(GFB)	

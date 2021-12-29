@@ -1347,7 +1347,6 @@ do --flight recommendations
 			if not nearestDestFlight then
 				local mapInfo = C_Map.GetMapInfo(destinationID)
 				local nodes = storedNodes[originID] or C_TaxiMap.GetTaxiNodesForMap(originID)
-			--	local nearestDestFlight,   nearestDestFlightDist
 					
 				for index, taxiNodeInfo in pairs(nodes) do
 					if taxiNodeInfo.name == mapInfo.name then
@@ -1360,7 +1359,6 @@ do --flight recommendations
 					end
 				end
 			end
-
 
 			if nearestOriginFlight and nearestDestFlight and nearestOriginFlight.name ~= nearestDestFlight.name then
 				local dist = nearestOriginFlightDist + nearestDestFlightDist
@@ -1376,9 +1374,7 @@ do --flight recommendations
 					else
 						one = nil
 					end					
-
-										
-					return {origin = {
+						return {origin = {
 							x = nearestOriginFlight.position.x,
 							y = nearestOriginFlight.position.y,
 							mapID = nearestOriginFlight.position.mapID,
@@ -1387,8 +1383,6 @@ do --flight recommendations
 					}
 				end
 			else
-
-			
 				noFly[metric] = true
 			end
 		end
@@ -1398,6 +1392,18 @@ end
 
 do --to do: combine portal and flight point recommendations to offer transit itineraries
 	function Questra:GetAlternateWaypoints(dX, dY, dID)
+		local noRoutes, alwaysAltRoute =  Questra:GetAlternate()
+		if noRoutes == true then
+			Questra.TrackerScrollButton.AltRouteFlasher.flashAnimation:Stop()
+			Questra.TrackerScrollButton.AltRouteFlasher:Hide()
+			Questra.TrackerScrollButton.AltRouteFlasher.flash:Hide()
+			return dX, dY, dID
+		end
+		if alwaysAltRoute == true and Questra.possibleWaypont then
+			Questra.portalSense = Questra.possibleWaypont
+			Questra.possibleWaypont= nil 
+		end
+
 		local _dX, _dY, _dID = dX, dY, dID
 		local portalAvailable
 		if Questra:GetTracked() and Questra:GetTracked().allowPortals == true then
@@ -1431,6 +1437,8 @@ do --to do: combine portal and flight point recommendations to offer transit iti
 				Questra.TrackerScrollButton.AltRouteFlasher.flashAnimation:Stop()
 				Questra.TrackerScrollButton.AltRouteFlasher:Hide()
 				Questra.TrackerScrollButton.AltRouteFlasher.flash:Hide()
+				Questra.portalSense = flightAvailable or portalAvailable
+				
 				return _dX, _dY, _dID
 			end
 		else

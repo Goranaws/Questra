@@ -1,5 +1,5 @@
 local AddonName, Questra = ...
-local itemButton = {name = "itemButton", parentElementName = "frame"}
+local itemButton = {name = "itemButton", displayName = "Item Button", parentElementName = "frame"}
 
 function itemButton:Build(...)
 	local button = CreateFrame("Button", AddonName.."_ItemButton", self, "QuestraItemButtonTemplate")
@@ -9,11 +9,33 @@ function itemButton:Build(...)
 	button:SetPoint("Right", self, "Right", 7, -25)
 	button:SetSize(35, 35)
 	button.width, button.height = button:GetSize()
-		
+
+	itemButton.button = button
+
 	return button
 end
 
+itemButton.Layout = function(self, sets)
+	self:ClearAllPoints()
+	if sets.flip == true then
+		self:SetPoint("Right", self:GetParent(), "Right", 7, 21)
+		self.yAnchor = 21
+		self.ybump = -1
+	else
+		self:SetPoint("Right", self:GetParent(), "Right", 7, -25)
+		self.yAnchor = -25
+		self.ybump = 1
+	end
+end
+
 function itemButton:OnQuestUpdate(currentQuestID)
+	if itemButton.sets.disable == true then
+		if self:IsShown() then
+			self:Hide()
+		end
+		return
+	end
+
 	currentQuestID = (currentQuestID and type(currentQuestID) == "number") and currentQuestID or nil
 	local items = self.items
 
@@ -141,6 +163,36 @@ itemButton.scripts = {
 		GameTooltip:SetItemByID(self.QuestID)
 		self:OnQuestUpdate()
 	end,
+	OnMouseDown = function(self)
+		if self.width and self.height then
+			self.textureHandler:SetSize(self.width -3, self.height + 5)
+			self.textureHandler:SetPoint("Center", self, -2, self.ybump)
+		end
+	end,
+	OnMouseUp = function(self)
+		if self.width and self.height then
+			self.textureHandler:SetSize(self.width, self.height)
+			self.textureHandler:SetPoint("Center", self)
+		end
+	end,
 }
+
+itemButton.options = {
+		{
+			kind = "CheckButton",
+			title = "Disable",
+			key = "disable",
+			default = false,
+			OnClick = function(self)
+				itemButton.sets.disable = not itemButton.sets.disable
+				self:SetChecked(itemButton.sets.disable)
+				
+				itemButton.OnQuestUpdate(itemButton.button, itemButton.disable)	
+			end,
+			OnShow = function(self)
+				self:SetChecked(itemButton.sets.disable)
+			end,
+		},
+	}
 
 Questra:AddElement(itemButton)	
